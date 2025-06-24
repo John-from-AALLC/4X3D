@@ -1,0 +1,115 @@
+; This is the setup file for 4X3D - 04/24/2020
+;
+; File Format:		Anything following a semicolon is ignored (i.e. a comment) until line feed
+;			Anything in curly braces is passed to tinyG as a JSON command
+;			Anything in square braces is considered a 4X3D program parameter
+;
+;  Get tinyG information
+{"qv":1}			;  set buffer queue reports to filtered
+{"sv":1}
+{"sr":{line:f,posx:t,posy:t,posz:t,vel:t,unit:f,stat:t}}
+;
+;  Setup motors
+{"1ma":0}			;  map motors to controllers
+{"2ma":1}
+{"3ma":2}
+{"4ma":3}			
+{"1sa":1.8}			;  set step angles
+{"2sa":1.8}
+{"3sa":1.8}
+{"4sa":1.8} 	
+{"1tr":40.00}			;  set travel per rev
+{"2tr":40.00}			;  40mm distance per turn = 20 tooth pulley at 2mm/tooth - x&y-axis
+{"3tr":8.00}			;  1mm distance per turn - z-axis
+{"4tr":1.00}			;  1mm distance per turn - tool/matl drives
+{"1mi":8}			;  set micro steps per whole step
+{"2mi":8}
+{"3mi":8}
+{"4mi":8}			
+{"1po":0}			;  set motor polarity/direction
+{"2po":0}
+{"3po":0}
+{"4po":0}		
+{"1pm":2}			;  0=disabled, 1=always on, 2=on when in cycle, 3=on when moving
+{"2pm":2}
+{"3pm":2}
+{"4pm":0}			;  off during intialization, turns on when tool selected
+{"mt":300}			;  motor hold time-out after cycle in seconds
+;  Initially set all limit switches to disabled.  They selectively get enabled below.
+{"xsn":0}
+{"xsx":0}
+{"ysn":0}
+{"ysx":0}
+{"zsn":0}
+{"zsx":0}
+{"asn":0}
+{"asx":0}
+{"st":0} 			;  initially set all switches to Normally Open type
+;  Setup Z axis and move up slightly before homing other axes
+{"zam":1}			;  set axis mode to standard linear
+{"zvm":7000}			;  set velocity maximum
+{"zfr":5000}			;  set feed rate maximum
+{"zjh":8000}	 		;  set homing jerk
+{"zjm":6000} 			;  set motion jerk
+{"zsn":0}			;  set min switch to home only
+{"zsx":1}			;  set max switch to disabled
+{"ztm":300}			;  set max travel dist
+{"zsv":300}			;  set homing search velocity
+{"zlv":50}			;  set homing latch velocity
+{"zlb":5}			;  set dist to back off switch to clear hit
+{"zzb":1}			;  set dist to back off switch to set zero
+{"ztn":-10}			;  set min travel dist
+{"gc":"G28.2 Z0"}		;  execute homing sequence to limit switch
+;  Setup X axis
+{"xam":1}			;  set axis mode to standard linear
+{"xvm":30000}			;  set velocity maximum
+{"xfr":15000}			;  set feed rate maximum
+{"xjh":12000}	 		;  set homing jerk (X 10^6)
+{"xjm":12000} 			;  set motion jerk (X 10^6)
+{"xjd":0.04}			;  set jerk deviation in mm
+{"xsn":1}			;  set min switch to home only
+{"xsx":0}			;  set max switch to disabled
+{"xtm":480}			;  set max travel dist
+{"xsv":1000}			;  set homing search velocity
+{"xlv":50}			;  set homing latch velocity
+{"xlb":5}			;  set dist to back off switch to clear hit
+{"xzb":2}			;  set dist to back off switch to set zero
+{"xtn":0}			;  set min travel dist
+{"gc":"G28.2 X0"}		;  execute homing sequence to limit switch
+;  Setup Y axis
+{"yam":1}			;  set axis mode to standard linear
+{"yvm":30000}			;  set velocity maximum
+{"yfr":15000}			;  set feed rate maximum
+{"yjh":12000} 			;  set homing jerk (X 10^6)
+{"yjm":12000} 			;  set motion jerk (X 10^6)
+{"yjd":0.04}			;  set jerk deviation in mm
+{"ysn":1}			;  set min switch to home only
+{"ysx":0}			;  set max switch to disabled
+{"ytm":450}			;  set max travel dist
+{"ysv":1000}			;  set homing search velocity
+{"ylv":50}			;  set homing latch velocity
+{"ylb":5}			;  set dist to back off switch to clear hit
+{"yzb":2}			;  set dist to back off switch to set zero
+{"ytn":0}			;  set min travel dist
+{"gc":"G28.2 Y0"}		;  execute homing sequence to limit switch
+; Setup A axis
+{"aam":1}			;  set axis mode to standard linear
+{"avm":10000}			;  set velocity maximum
+{"afr":10000}			;  set feed rate maximum
+{"ajh":6000} 			;  set homing jerk (not used in 4X3D)
+{"ajm":5000}	 		;  set motion jerk
+{"ajd":0.02}			;  set jerk deviation in mm
+{"asn":0}			;  set min switch to not there  (goes to RPI3 GPIO instead)
+{"asx":0}			;  set max switch to not there (goes to RPI3 GPIO instead)
+{"atm":25000}			;  set max travel dist
+{"asv":250}			;  set homing search velocity
+{"alv":200}			;  set homing latch velocity
+{"alb":5}			;  set dist to back off switch to clear hit
+{"azb":2}			;  set dist to back off switch to set zero
+{"atn":-500}			;  set min travel dist
+{"gc":"G28.3 A30.0"}		;  set current position to home
+{"sl":0}			;  disable soft limits
+; Set global parameters
+{"ja":5000000}			;  global cornering acceleration value
+
+
