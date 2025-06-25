@@ -1047,6 +1047,7 @@ int job_clear(void)
 {
   int	h,i;
   
+  job.sync=FALSE;
   job.prev_state=job.state;
   job.state=JOB_NOT_READY;
   job.regen_flag=TRUE;
@@ -1372,7 +1373,7 @@ int job_slice(void)
     }
   
   // reset job status if user deleted all pending models
-  if(job.model_first==NULL && job.state>=JOB_READY)job.state=JOB_NOT_READY;
+  if(job.model_first==NULL && job.state>=JOB_READY){job.state=JOB_NOT_READY;}
   
   display_model_flag=TRUE;
   sprintf(scratch,"Job sliced.");
@@ -2763,7 +2764,7 @@ int job_build_tree_support(void)
 {
   int		debug_ctr=0;
   int		status=TRUE,match,make_node;
-  int		h,i,j,slot;
+  int		h,i,j,slot,add_spt;
   int	 	branch_vtx_cnt=8;
   int		temp_branch_cnt=0,tree_branch_cnt=0;
   int		patch_cnt,mfacet_dn_cnt,mfacet_up_cnt;
@@ -2803,6 +2804,21 @@ int job_build_tree_support(void)
   branch 	*nbrptr,*nbrtest,*nbrpre,*nbrbest;
   branch_list	*bl_ptr,*bl_neighbor_list;
   
+  // determine if user is requesting support
+  {
+    add_spt=FALSE;
+    mptr=job.model_first;
+    while(mptr!=NULL)
+      {
+      slot=(-1);							// default no tool selected
+      slot=model_get_slot(mptr,OP_ADD_SUPPORT_MATERIAL);		// determine which tool is adding support
+      if(slot>=0 && slot<MAX_TOOLS)add_spt=TRUE;			// if a viable tool is specified...
+      mptr=mptr->next;
+      }
+    printf("Support Check:  slot=%d \n",slot);
+    if(add_spt==FALSE)return(FALSE);
+  }
+
   // initialize
   {
     // loop thru all models in this job.  this is a job level function since the user has the ability to "stack"

@@ -1359,7 +1359,7 @@ int		init_done_flag=FALSE;					// flag to indicate full system init done
 int		gpio_ready_flag=FALSE;					// flag to indicate gpio can be used
 int		carriage_at_home=FALSE;					// flag to indicate if carriage at home position
 int		on_part_flag=FALSE;					// flag to indicate if tool is working on part
-vertex 		*pause_vtx=NULL;					// model vtx at which pause occured
+vertex		*vtx_last_printed;
 vertex		*vtx_debug;
 vertex 		*vmid,*vlow,*vhgh;
 vector		*vec_debug;
@@ -2488,6 +2488,7 @@ static void abort_job( GtkWidget *btn, gpointer user_data )
   job.prev_state=job.state;						// save incoming state
   job.state=JOB_ABORTED_BY_USER;					// set to define this action 
   clear_models_flag=FALSE;						// set default to bypass clearing code
+  job.sync=TRUE;
   if(job.prev_state<JOB_RUNNING) 
     {
     sprintf(scratch,"All loaded models will be cleared.\n");
@@ -2569,6 +2570,7 @@ static void abort_job( GtkWidget *btn, gpointer user_data )
 
 // Function to convert print coords back to model coords
 // This function will take in the print coords of vptr and modify them to model coords.
+// This is typically used to convert PostG.x/y/z coords backward to a model coord.
 int Print_to_Model_Coords(vertex *vptr, int slot)
 {
   // validate inputs
@@ -2592,6 +2594,7 @@ int Print_to_Model_Coords(vertex *vptr, int slot)
   if(slot==1 || slot==3)vptr->x += Tool[slot].x_offset;			// tool mounted nearer to x home
   if(slot==0 || slot==2)vptr->y += Tool[slot].y_offset;
   if(slot==1 || slot==3)vptr->y -= Tool[slot].y_offset;			// account for tool being flipped 180 degrees on carriage
+  vptr->z -= Tool[slot].tip_dn_pos;					// acount for z depth of tool
 
   // subtract off fabrication tool offsets from calibration - these use the switch position as reference
   // since a tool can be mounted in any location on the carriage, we need to adjust the +/- offset
@@ -2600,7 +2603,7 @@ int Print_to_Model_Coords(vertex *vptr, int slot)
   if(slot==1 || slot==3)vptr->x += Tool[slot].mmry.md.tip_pos_X;	// tool mounted nearer to x home
   if(slot==0 || slot==2)vptr->y += Tool[slot].mmry.md.tip_pos_Y;
   if(slot==1 || slot==3)vptr->y -= Tool[slot].mmry.md.tip_pos_Y;	// account for tool being flipped 180 degrees on carriage
-  //PosIs.z+=Tool[slot].mmry.md.tip_pos_Z;				// z is handled by tip deposit function
+  vptr->z += Tool[slot].mmry.md.tip_pos_Z;				// likely too small to notice
 
   return(TRUE);
 }
@@ -4835,16 +4838,17 @@ gboolean model_draw_callback (GtkWidget *widget, cairo_t *cr, gpointer data)
       cairo_stroke(cr);
     }
     
-    // draw tool spot on XY plane
-    {
+    // draw tool spot XYZ spot in build volume
+    if(set_view_tool_pos==TRUE)
+      {
       vtool_pos=vertex_make();
       vtool_pos->x=PostG.x;
       vtool_pos->y=PostG.y;
-      vtool_pos->z=0.0;
+      vtool_pos->z=PostG.z;
       Print_to_Model_Coords(vtool_pos,0);
       x2=vtool_pos->x;
       y2=vtool_pos->y;
-      z2=0.0;
+      z2=vtool_pos->z;
       set_color(cr,&color,LT_RED);
       cairo_set_line_width (cr,2.0);
       zh=1+(600 + (MVview_scale*(x2-MVdisp_cen_x))*oss - (MVview_scale*(0-y2-MVdisp_cen_y))*osc + (MVview_scale*(z2-MVdisp_cen_z))*ots)/600*pers_scale;
@@ -9903,6 +9907,7 @@ static gboolean on_idle_status_poll(GtkWidget *hbox)
 	  if(remove_count>0)printf("\n\n WARNING: Loose 5v or LOOP BACK connection detected on tool %d! \n\n",(slot+1));
 	  remove_count=0;
 	  job.state=JOB_NOT_READY;					// this will effectively abort the job
+	  job.sync=TRUE;
 	  // deal with case when toolUI window is up
 	  if(win_tool_flag[slot]==TRUE)
 	    {
@@ -10195,6 +10200,7 @@ static gboolean on_idle_status_poll(GtkWidget *hbox)
 	    {
 	    job.prev_state=job.state;					// ... save where we were
 	    job.state=JOB_SLEEPING;					// ... set jobstate to indicate we are in setback
+	    job.sync=TRUE;
 	    good_to_go=FALSE;						// ... reset so no auto start can happen
 	    for(i=0;i<MAX_THERMAL_DEVICES;i++)				// ... cycle thru all devices
 	      {
@@ -10225,6 +10231,7 @@ static gboolean on_idle_status_poll(GtkWidget *hbox)
 	    if(RPi_GPIO_Read(FILAMENT_OUT)==ON)
 	      {
 	      job.state==JOB_PAUSED_BY_CMD;				// if out of filament, force system to pause
+	      job.sync=TRUE;
 	      Tool[slot].matl.mat_used=Tool[slot].matl.mat_volume;	// set volume used to volume of spool (i.e. 0% remaining)
 	      }
 	    #endif
@@ -10426,6 +10433,7 @@ static gboolean on_idle_status_poll(GtkWidget *hbox)
 	//if(Tool[slot].tip_cr_pos>(Tool[slot].tip_up_pos+1))
 	//  {
 	//  job.state=JOB_PAUSED_DUE_TO_ERROR;
+	//  job.sync=TRUE;
 	//  Tool[slot].state=TL_FAILED;
 	//  printf("\n\n** ERROR - SLOT %d OUT OF TIP POSITION **\n\n",slot);
 	//  }
@@ -10573,6 +10581,7 @@ static gboolean on_idle_status_poll(GtkWidget *hbox)
 	if(job.regen_flag==FALSE)					// good to go once slicing is done
 	  {
 	  job.state=JOB_READY;						// if temps are at operational
+	  job.sync=TRUE;
     
 	  // set state depending on if build table are at temp. carriage tools get taken care of by print loop
 	  // check build table
@@ -10580,12 +10589,14 @@ static gboolean on_idle_status_poll(GtkWidget *hbox)
 	  if(q>Tool[BLD_TBL1].thrm.tolrC)
 	    {
 	    job.state=JOB_HEATING;					// if temp not close enough, then stay at heating
+	    job.sync=TRUE;
 	    }
 	  else 
 	    {
 	    if(good_to_go==TRUE)
 	      {
 	      job.state=JOB_READY;					// otherwise if user play was pressed and now at temp, go
+	      job.sync=TRUE;
 	      change_job_state(NULL,NULL);
 	      }
 	    }
@@ -10814,6 +10825,7 @@ static gboolean on_idle_status_poll(GtkWidget *hbox)
       else {sprintf(job_status_msg,"%s",idl_scratch);}
       tool_add_matl(NULL, GINT_TO_POINTER(current_tool));		// show dialog to load new bit
       job.state=JOB_PAUSED_BY_USER;					// change state to user paused to not redisplay dialog
+      job.sync=TRUE;
       if(img_job_btn_index!=1)
 	{
 	gtk_image_clear(GTK_IMAGE(img_job_btn));
@@ -11183,11 +11195,13 @@ static gboolean on_idle_status_poll(GtkWidget *hbox)
     if(thermal_thread_alive!=1)
       {
       job.state=JOB_PAUSED_DUE_TO_ERROR;
+      job.sync=TRUE;
       printf("\n\n** ERROR - thermal thread is not responding! ** \n\n");
       }
     if(job.state>JOB_READY && print_thread_alive!=1)			// only worry about it when we need to use it
       {
       job.state=JOB_PAUSED_DUE_TO_ERROR;
+      job.sync=TRUE;
       printf("\n\n** ERROR - print engine thread is not responding! ** \n\n");
       }
 

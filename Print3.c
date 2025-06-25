@@ -29,6 +29,15 @@ int print_vertex(vertex *vptr, int slot, int pmode, linetype *lptr)
   //prt_debug=TRUE;
   print_thread_alive=1;							// set to indicate this function still alive
   if(vptr!=NULL)VId++;							// increment vertex count
+  
+  // record last on part vtx for return from pause
+  if(vptr!=NULL && on_part_flag==TRUE)
+    {
+    vtx_last_printed->x=vptr->x;
+    vtx_last_printed->y=vptr->y;
+    vtx_last_printed->z=vptr->z;
+    vtx_last_printed->attr=vptr->attr;
+    }
 
   // if in abort job mode...
   if(job.state==JOB_PAUSED_BY_CMD)return(job.state);
@@ -781,9 +790,8 @@ int print_status(jobx *local_job)
   while(job.state!=JOB_RUNNING)
     {
     print_thread_alive=1;
-    if(job.state==JOB_ABORTED_BY_USER){local_job->state=job.state; return(0);}	// exit pause (no need to move carriage) and force system out of print loop
-    if(job.state==JOB_ABORTED_BY_SYSTEM){local_job->state=job.state; return(0);}
-    if(job.state==JOB_ERROR_UNKNOWN){local_job->state=job.state; return(0);}
+    g_main_context_iteration(NULL, FALSE);
+    delay(100);
     }
    
   // resume once user changes state back to running
@@ -802,7 +810,7 @@ int print_status(jobx *local_job)
       }
     if(prev_air_status==ON)tool_air(tool_at_pause,ON);			// turn air back on
     
-    comefrom_machine_home(tool_at_pause,pause_vtx);
+    comefrom_machine_home(tool_at_pause,vtx_last_printed);		// move back to part
     on_part_flag=TRUE;							// set to indicate back on part
     make_toolchange(tool_at_pause,1);					// make tool active again
     tool_tip_deposit(tool_at_pause);					// wait for tool to reach position
@@ -814,11 +822,12 @@ int print_status(jobx *local_job)
       //while(Tool[tool_at_pause].thrm.heat_status==OFF);
       }
     }
-  // handles generic failure... shouldn't get here, but just in case
+  // handle everything else but a return to job running
   else 
     {
-    local_job->state=job.state; 
-    return(0);
+    local_job->state=job.state; 					// push user job state into local job state
+    job.sync=FALSE;							// no need to sync
+    return(0);								// return with "failure"
     }
 
   // enter data to process log file
@@ -1254,8 +1263,10 @@ int motion_complete(void)
   
   motion_is_complete=FALSE;						// set to indicate we may still be moving
 
+  printf("  checking tinyg_rcv...\n");
   while(tinyGRcv(0)>=0);						// get latest tinyg feedback
 
+  printf("  checking buffer...\n");
   oldCmd=cmdControl;							// save current state of cmdControl
   cmdControl=0;								// turn off for this.  no need to buffer these requests
   time_start=time(NULL);
@@ -1294,17 +1305,19 @@ int motion_complete(void)
     // if failed for some reason...
     if(status==FALSE)
       {
-      printf("\n\n*** ERROR - Motion complete timed out waiting for buffer to empty! ***\n");
-      printf("            Unable to empty motion control buffer.  time delta=%d \n\n",(time_now-time_start));
+      printf("\n\nERROR - Motion complete timed out waiting for buffer to empty!\n");
+      printf("        Unable to empty motion control buffer.  time delta=%d \n\n",(time_now-time_start));
       tinyGSnd("!\n");							// something went wrong... stop
       tinyGSnd("%\n");							// clear the buffer
       while(tinyGRcv(0)==0);						// get all tinyG has to say
       bufferAvail=MAX_BUFFER;						// resync buffer space after clearing buffer
       job.state=JOB_PAUSED_DUE_TO_ERROR;
+      job.sync=TRUE;
       break;
       }
     }
     
+  printf("  checking for motion...\n");
   if(status==TRUE)							// if buffer empty was successful...
     {
     time_start=time(NULL);
@@ -1335,13 +1348,14 @@ int motion_complete(void)
       // if failed for some reason...
       if(status==FALSE)
 	{
-	printf("\n\n*** ERROR - Motion complete timed out waiting for last move to complete! ***\n\n");
-	printf("            Unable to complete last move.  time delta=%d \n\n",(time_now-time_start));
+	printf("\n\nERROR - Motion complete timed out waiting for last move to complete!\n");
+	printf("        Unable to complete last move.  time delta=%d \n\n",(time_now-time_start));
 	tinyGSnd("!\n");						// something went wrong... stop
 	tinyGSnd("%\n");						// clear the buffer
 	while(tinyGRcv(0)==0);						// get all tinyG has to say
 	bufferAvail=MAX_BUFFER;						// resync buffer space after clearing buffer
 	job.state=JOB_PAUSED_DUE_TO_ERROR;
+	job.sync=TRUE;
 	break;
 	}
       }
@@ -1531,7 +1545,7 @@ int goto_machine_home(void)
     PosIs.x=PostG.x;							// record current position
     PosIs.y=PostG.y;
     PosIs.z=PostG.z;
-    
+
     #ifdef ALPHA_UNIT
       sprintf(gcode_burst,"G90 G0 Z%f F300\n",PostG.z+10.0);		// raise carriage out of the way
       tinyGSnd(gcode_burst);
@@ -1705,6 +1719,7 @@ void* build_job(void *arg)
     
     // at this point, a job has be requested to run so copy the public job over to the local job
     // to minimize thread conflicts
+    job.sync=FALSE;
     memcpy(&local_job,&job,sizeof(job));
 
     // check that user has set everything needed to run the job
@@ -2142,9 +2157,9 @@ void* build_job(void *arg)
 	mptr=job_layer_seek(LEVEL);					// ... find model that has slice at this level.  leave z_cut as is.
 	}
       }
-    if(local_job.type==SUBTRACTIVE || local_job.type==MARKING)			// we want to start at top surface of target
+    if(local_job.type==SUBTRACTIVE || local_job.type==MARKING)		// we want to start at top surface of target
       {
-      mptr=local_job.model_first;						// start with first model in job
+      mptr=local_job.model_first;					// start with first model in job
       while(mptr!=NULL)							// loop thru all models
 	{
 	if(set_start_at_crt_z==FALSE)					// if starting on the build table...
@@ -2161,9 +2176,8 @@ void* build_job(void *arg)
 	mptr=mptr->next;
 	}
       repeat_first_slice=TRUE;						// set to reprint same job over and over until aborted
+      mptr=local_job.model_first;						// to be here local_job.model_first must exist
       }
-    mptr=local_job.model_first;						// to be here local_job.model_first must exist
-    printf("Print: B  zcut=%f  mptr=%X  mptr->current_z=%f  start_at_z=%d \n",z_cut,mptr,mptr->current_z,set_start_at_crt_z);
 
     // determine tool (slot) that will be used with the stating model
     slot=(-1); next_slot=(-1); prev_slot=(-1);				// init to invalid tool
@@ -2179,7 +2193,7 @@ void* build_job(void *arg)
       {
       printf("\n\nPrint: *** ERROR - no available tool! *** \n\n");
       local_job.state=JOB_ABORTED_BY_SYSTEM;						
-      if(print_status(&local_job)==0)break;				// process abort
+      print_status(&local_job);
       }
     if(aptr!=NULL)
       {if(aptr->next!=NULL)next_slot=(aptr->next)->ID;}			// init next tool slot
@@ -2188,12 +2202,10 @@ void* build_job(void *arg)
     // init job params to match our (re)starting point
     sptr=slice_find(mptr,MODEL,slot,z_cut,mptr->slice_thick);		// find this model's slice at this z level
     if(sptr==NULL)sptr=mptr->slice_last[slot];				// null is not an option here
-    //local_job.start_time=time(NULL)-sptr->time_estimate;			// go back in time to when it would have started
+    //local_job.start_time=time(NULL)-sptr->time_estimate;		// go back in time to when it would have started
     local_job.current_z=z_cut;						// set to current view z slider position
-    hist_ctr_run=(int)(local_job.current_z/local_job.min_slice_thk);		// set history counter to starting layer count
+    hist_ctr_run=(int)(local_job.current_z/local_job.min_slice_thk);	// set history counter to starting layer count
     
-    printf("Print: C  sptr=%X  mptr=%X \n",sptr,mptr);
-
     PostGVCnt=1; PostGFCnt=1;						// init velocity and flow rate counters for performance view
     PostGVAvg=0; PostGFAvg=0;
     first_model_flag=TRUE;						// init that this is the first model to get attention
@@ -2213,9 +2225,6 @@ void* build_job(void *arg)
     tool_air(slot,OFF);							// turn tool air off
     if(Tool[slot].tool_ID==TC_LASER)Tool[slot].thrm.heat_duty=0.0;	// turn tool PWM off
     
-    printf("About to launch printing:  zcut=%f  sptr->z=%f   mptr=%X  mptr->z=%f  zoff[MODEL]=%f \n",
-           z_cut,sptr->sz_level,mptr,mptr->current_z,mptr->zoff[MODEL]);
-    //while(!kbhit());
 
     // PRIMARY OPERATING LOOP:  build/remove layers until we've reached the top/bottom ---------------------------------------
     while(TRUE)
@@ -2458,13 +2467,17 @@ void* build_job(void *arg)
 		if(sptr_check!=NULL)sptr=sptr_check;
 		}
 	      vptr=pptr->vert_first;						// starting vertex
+	      vtx_last_printed->x=vptr->x;					// forced new target for comefrom_machine_home
+	      vtx_last_printed->y=vptr->y;
+	      vtx_last_printed->z=vptr->z;
+	      vtx_last_printed->attr=vptr->attr;
 	      if(vptr!=NULL)							// if a viable vertex...
 		{
 		//vptr->attr=ptyp;
 		if(mptr->mdl_has_target==TRUE)vptr->z=mptr->zmax[TARGET];	// set to top surface of target
 		if(carriage_at_home==TRUE)					// if at home...
 		  {
-		  comefrom_machine_home(slot,vptr);				// ... move onto part at vptr
+		  comefrom_machine_home(slot,vtx_last_printed);			// ... move onto part at vptr
 		  on_part_flag=TRUE;						// ... set flag as such
 		  }
 		else 								// if not at home...
