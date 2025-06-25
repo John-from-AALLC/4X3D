@@ -1146,6 +1146,7 @@ int init_general(void)
     printf("Tools init done.\n");
     
     // init job
+    job.sync=FALSE;
     job.prev_state=UNDEFINED;
     job.state=UNDEFINED;
     job.regen_flag=FALSE;

@@ -26,7 +26,7 @@
 
 // Defines for version control
 #define AA4X3D_MAJOR_VERSION 0
-#define AA4X3D_MINOR_VERSION 623
+#define AA4X3D_MINOR_VERSION 625
 #define AA4X3D_MICRO_VERSION 2
 
 // Defines for math
@@ -1094,6 +1094,7 @@ carriage crgslot[MAX_THERMAL_DEVICES];
 // Job data structure
 typedef struct st_job
 	{
+	int			sync;					// flag used to syncronize public data with print thread local data
 	int			state;					// current status of the job
 	int			prev_state;				// previous status of the job
 	int			regen_flag;				// indicates if job values need refresh
@@ -2119,7 +2120,7 @@ void motion_done(void);
 int print_vertex(vertex *vptr, int slot, int pmode, linetype *lptr);	// moves/prints from current location to vertex location
 int temperature_adjust(int slot, float newTemp, int wait4it);
 int step_aside(int slot, int wait_duration);
-int print_paused(int pause_spot);
+int print_status(jobx *local_job);
 int tool_PWM_set(int slot, int port, int new_duty);
 int tool_PWM_check(int slot, int port);
 int tool_power_ramp(int slot, int port, int new_duty);
@@ -2334,6 +2335,7 @@ static void change_job_state( GtkWidget *btn, gpointer user_data )
   printf("\nJob State: inbound=%d ",job.state);
 
   job.prev_state=job.state;						// save in-bound state for future reference
+  job.sync=TRUE;							// set flag to indicate user made a job state change
   if(job.state==JOB_READY)						// job is ready... this is first switch to running state
     {
     // autocalibrate tool tips if more than one tool used in this job
@@ -2435,38 +2437,38 @@ static void change_job_state( GtkWidget *btn, gpointer user_data )
     return;
     }
   if(job.state==JOB_ABORTED_BY_SYSTEM)					// unknown error encountered... run diagnostics
+    {
+
+    printf("\nSystem error detected!\n");
+
+    printf("Checking status of thermal thread...");
+    thermal_thread_alive=0;
+    delay(500);
+    if(thermal_thread_alive==0 && init_done_flag==TRUE)
       {
-
-      printf("\nThread error detected!\n");
-
-      printf("Checking status of thermal thread...");
-      thermal_thread_alive=0;
-      delay(500);
-      if(thermal_thread_alive==0 && init_done_flag==TRUE)
+      printf("not responding!\n");
+      
+      // RE-init PWM contorller
+      pca9685PWMReset(I2C_PWM_fd);					// reset to default values (know state)
+      delay(250);							// give time for reset to process
+      pca9685PWMFreq(I2C_PWM_fd,500);					// fix freq for all channels at 500 hz
+      delay(250);							// give time for reset to process
+      if(current_tool>=0 && current_tool<MAX_THERMAL_DEVICES)
 	{
-	printf("not responding!\n");
-	
-	// RE-init PWM contorller
-	pca9685PWMReset(I2C_PWM_fd);					// reset to default values (know state)
-	delay(250);							// give time for reset to process
-	pca9685PWMFreq(I2C_PWM_fd,500);					// fix freq for all channels at 500 hz
-	delay(250);							// give time for reset to process
-	if(current_tool>=0 && current_tool<MAX_THERMAL_DEVICES)
-	  {
-	  pca9685PWMWrite(I2C_PWM_fd,1,0,Tool[current_tool].thrm.heat_duration);	// send to PWM for TEST PIN
-	  }
+	pca9685PWMWrite(I2C_PWM_fd,1,0,Tool[current_tool].thrm.heat_duration);	// send to PWM for TEST PIN
 	}
-      if(thermal_thread_alive==1)printf("seems okay!\n");
-
-      printf("Checking status of print engine thread...");
-      print_thread_alive=0;
-      delay(500);
-      if(print_thread_alive==0)printf("not responding!\n");
-      if(print_thread_alive==1)printf("seems okay!\n");
-
-      job.state=JOB_PAUSED_DUE_TO_ERROR;
-      return;
       }
+    if(thermal_thread_alive==1)printf("seems okay!\n");
+
+    printf("Checking status of print engine thread...");
+    print_thread_alive=0;
+    delay(500);
+    if(print_thread_alive==0)printf("not responding!\n");
+    if(print_thread_alive==1)printf("seems okay!\n");
+
+    job.state=JOB_PAUSED_DUE_TO_ERROR;
+    return;
+    }
 
   return;
 }

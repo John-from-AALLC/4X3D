@@ -24,7 +24,7 @@
 
 // Defines for version control
 #define AA4X3D_MAJOR_VERSION 0
-#define AA4X3D_MINOR_VERSION 623
+#define AA4X3D_MINOR_VERSION 625
 #define AA4X3D_MICRO_VERSION 2
 
 // Defines for math
@@ -1092,6 +1092,7 @@ extern carriage crgslot[MAX_THERMAL_DEVICES];
 // Job data structure
 typedef struct st_job
 	{
+	int			sync;					// flag used to syncronize public data with print thread local data
 	int			state;					// current status of the job
 	int			prev_state;				// previous status of the job
 	int			regen_flag;				// indicates if job values need refresh
@@ -2074,7 +2075,7 @@ extern int motion_complete(void);
 extern void motion_done(void);
 extern int print_vertex(vertex *vptr, int slot, int pmode, linetype *lptr); // moves/prints from current location to vertex location
 extern int temperature_adjust(int slot, float newTemp, int wait4it);
-extern int print_paused(int pause_spot);
+extern int print_status(jobx *local_job);
 extern int step_aside(int slot, int wait_duration);
 extern int tool_PWM_set(int slot, int port, int new_duty);
 extern int tool_PWM_check(int slot, int port);

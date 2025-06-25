@@ -704,10 +704,13 @@ int temperature_adjust(int slot, float newTemp, int wait4it)
   return(status);
 }
 
-// Function to handle PAUSED job state
-// The print loop will jump to this function for any state other than JOB_RUNNING.  Job states are switched by the
-// presistant control buttons on the left side of the primary window.  Two specifically, either PAUSE or ABORT.
-int print_paused(int pause_spot)
+// Function to check print status if a job.sync is requested in the printing loop of build_job.
+// The print loop will jump to this function if job.sync flag is set.  That likely happend because
+// the user hit pause or abort which set the public job.state and raised the sync flag.  However,
+// it is possible the system detected a problem and forced the change as well.  Handle both here.
+// Input:  local_job is a pointer to the localized job data used in build_job
+// Return: 0=if anything other than JOB_RUNNING (i.e abort printing), 1=JOB_RUNNING (i.e. resume printing)
+int print_status(jobx *local_job)
 {
   char		proc_scratch[255];
   char 		gcode_rtn[255];
@@ -716,7 +719,28 @@ int print_paused(int pause_spot)
   float		XPause,YPause,ZPause;
   model 	*model_at_pause;
 
-  printf("\nPrint paused - entry.\n\n");
+  printf("\nPrint status - entry.\n\n");
+
+  // copy over the local_job status to public job
+  job.current_z=local_job->current_z;
+  job.current_dist=local_job->current_dist;
+  job.total_dist=local_job->total_dist;
+  job.penup_dist=local_job->penup_dist;
+  job.pendown_dist=local_job->pendown_dist;
+
+  // now determine why we wound up here.  if it was by a UI request, then we want to
+  // push the current job state into the local job state.  if it was by a problem
+  // encountered in the build_job function then we want to push the local job state
+  // into the public job state.
+  if(job.sync==TRUE)							// this is the flag to indicate the USER did something...
+    {
+    local_job->state=job.state;						// ... copy the state from public to local job
+    job.sync=FALSE;							// ... reset the flag
+    }
+  else 									// otherwise the system generated the state change
+    {
+    job.state=local_job->state;
+    }
 
   // save current conditions at start of pause
   tool_at_pause=current_tool;
@@ -728,9 +752,6 @@ int print_paused(int pause_spot)
   //sprintf(proc_scratch,"      Print paused. Job state = %d \n",job.state);
   //if(proc_log!=NULL){fwrite(proc_scratch,1,strlen(proc_scratch),proc_log); fflush(proc_log);}
 
-  // in the odd event that this routine is entered with job state incorrectly set, reset to hold here
-  if(job.state==JOB_RUNNING)job.state=JOB_PAUSED_DUE_TO_ERROR;
-  
   tinyGSnd(gcode_burst);						// send commands if any were pending
   memset(gcode_burst,0,sizeof(gcode_burst));				// ensure any pending moves are cleared
   motion_complete();							// let tinyG finish what it's doing
@@ -760,9 +781,9 @@ int print_paused(int pause_spot)
   while(job.state!=JOB_RUNNING)
     {
     print_thread_alive=1;
-    if(job.state==JOB_ABORTED_BY_USER)return(0);			// exit pause (no need to move carriage) and force system out of print loop
-    if(job.state==JOB_ABORTED_BY_SYSTEM)return(0);
-    if(job.state==JOB_ERROR_UNKNOWN)return(0);
+    if(job.state==JOB_ABORTED_BY_USER){local_job->state=job.state; return(0);}	// exit pause (no need to move carriage) and force system out of print loop
+    if(job.state==JOB_ABORTED_BY_SYSTEM){local_job->state=job.state; return(0);}
+    if(job.state==JOB_ERROR_UNKNOWN){local_job->state=job.state; return(0);}
     }
    
   // resume once user changes state back to running
@@ -793,11 +814,20 @@ int print_paused(int pause_spot)
       //while(Tool[tool_at_pause].thrm.heat_status==OFF);
       }
     }
+  // handles generic failure... shouldn't get here, but just in case
+  else 
+    {
+    local_job->state=job.state; 
+    return(0);
+    }
 
   // enter data to process log file
   //sprintf(proc_scratch,"      Print resumed. Job state = %d \n",job.state);
   //if(proc_log!=NULL){fwrite(proc_scratch,1,strlen(proc_scratch),proc_log); fflush(proc_log);}
 
+  local_job->state=job.state;
+  job.sync=FALSE;
+  
   printf("\nPrint paused - exit.\n\n");
   return(1);
 }
@@ -1670,18 +1700,18 @@ void* build_job(void *arg)
     print_thread_alive=TRUE;
     delay(250);
     
-    // copy global job data over to local job data for more thread safe operation
-    memcpy(&local_job,&job,sizeof(job));
-    
     // just spin waiting for job to be ready
-    if(local_job.state!=JOB_RUNNING)continue;					
+    if(job.state!=JOB_RUNNING)continue;					
     
-    // at this point, a job has be requested to run
+    // at this point, a job has be requested to run so copy the public job over to the local job
+    // to minimize thread conflicts
+    memcpy(&local_job,&job,sizeof(job));
+
     // check that user has set everything needed to run the job
     if(local_job.model_first==NULL)
       {
-      memcpy(&job,&local_job,sizeof(job));
       local_job.state=JOB_ABORTED_BY_SYSTEM; 
+      job.state=local_job.state;
       continue;
       }
   
@@ -1723,7 +1753,9 @@ void* build_job(void *arg)
     
     // update job maxmin boundaries
     job_maxmin();							// this will work off public copy
-    memcpy(&local_job,&job,sizeof(job));				// update local copy with public data
+    local_job.XMin=job.XMin; local_job.XMax=job.XMax;
+    local_job.YMin=job.YMin; local_job.YMax=job.YMax;
+    local_job.ZMin=job.ZMin; local_job.ZMax=job.ZMax;
     
     // flush any existing cmds from buffer
     cmdControl=1;
@@ -1765,12 +1797,7 @@ void* build_job(void *arg)
       if(Tool[slot].state==TL_EMPTY)continue;				// skip if not viable
       sprintf(job_status_msg," Homing tool tip positions. ");
       tool_tip_home(slot);
-      if(local_job.state!=JOB_RUNNING)
-        {
-	memcpy(&job,&local_job,sizeof(job));				// ... update public copy with local data
-	print_paused(1);						// ... go into pause
-	memcpy(&local_job,&job,sizeof(job));				// ... update local copy with public data
-	}
+      if(job.sync==TRUE){if(print_status(&local_job)==0)break;}		// check for pause/abort/etc.
       }
 
     // determine which tools this job is using so we don't waste time calibrating tools that are not used
@@ -1890,15 +1917,8 @@ void* build_job(void *arg)
 	free(vcal_end);	vertex_mem--;
 	Tool[slot].state=TL_READY;					// shift state from active back to ready
 	linet_state[slot]=UNDEFINED;
-	}
-      
-      //print_paused(MDL_BORDER);
-      //local_job.state=JOB_PAUSED_BY_CMD;
-      if(local_job.state!=JOB_RUNNING)
-        {
-	memcpy(&job,&local_job,sizeof(job));				// update public copy with local data
-	print_paused(0);						// abort if calibration failed
-	memcpy(&local_job,&job,sizeof(job));				// update local copy with public data
+
+	if(job.sync==TRUE){if(print_status(&local_job)==0)break;}	// check for pause/abort/etc.
 	}
       }
 
@@ -1923,6 +1943,9 @@ void* build_job(void *arg)
       mptr=local_job.model_first;
       while(mptr!=NULL)
 	{
+	if(job.sync==TRUE){if(print_status(&local_job)==0)break;}	// check for pause/abort/etc.
+	if(local_job.state!=JOB_RUNNING)break;				// accounts for nested looping
+
 	// determine if this model will get a base layer by looking thru its operations list
 	aptr=mptr->oper_list;						// start with first oper in list					
 	while(aptr!=NULL)						// loop thru all operations in sequence
@@ -1959,6 +1982,9 @@ void* build_job(void *arg)
 	lt_ptr=optr->lt_seq;
 	while(lt_ptr!=NULL)						
 	  {
+	  if(job.sync==TRUE){if(print_status(&local_job)==0)break;}	// check for pause/abort/etc.
+	  if(local_job.state!=JOB_RUNNING)break;			// accounts for nested looping
+
 	  // now get ptr to linetype for rest of data and proceed
 	  ptyp=lt_ptr->ID;
 	  lptr=linetype_find(slot,ptyp);
@@ -1978,9 +2004,13 @@ void* build_job(void *arg)
   
 	  for(x_copy_ctr=0;x_copy_ctr<mptr->xcopies;x_copy_ctr++)	// loop thru all in X
 	    {
+	    if(job.sync==TRUE){if(print_status(&local_job)==0)break;}	// check for pause/abort/etc.
+	    if(local_job.state!=JOB_RUNNING)break;			// accounts for nested looping
 	    mptr->xoff[mtyp]=original_xoff+x_copy_ctr*(mptr->xmax[mtyp]-mptr->xmin[mtyp]+mptr->xstp);	// calc X offset
 	    for(y_copy_ctr=0;y_copy_ctr<mptr->ycopies;y_copy_ctr++)	// loop thru all in Y
 	      {
+	      if(job.sync==TRUE){if(print_status(&local_job)==0)break;}	// check for pause/abort/etc.
+	      if(local_job.state!=JOB_RUNNING)break;			// accounts for nested looping
 	      mptr->yoff[mtyp]=original_yoff+y_copy_ctr*(mptr->ymax[mtyp]-mptr->ymin[mtyp]+mptr->ystp);	// calc Y offset
 	      if(mptr->active_copy>=mptr->total_copies)continue;	// if beyond total copies...
 	      mptr->active_copy++;					// increment copy counter
@@ -2005,6 +2035,8 @@ void* build_job(void *arg)
 	      pptr=sptr->pfirst[ptyp];
 	      while(pptr!=NULL)						// while we still have polygons to process
 		{
+		if(job.sync==TRUE){if(print_status(&local_job)==0)break;}	// check for pause/abort/etc.
+		if(local_job.state!=JOB_RUNNING)break;				// accounts for nested looping
 		cmdBurst=1;
 		burst_ctr=0;						// init burst counter to count down bursted cmds
 		vector_count=0;						// init vector counter used to count up number of vtx sent to tinyG in this polygon
@@ -2016,18 +2048,13 @@ void* build_job(void *arg)
 		print_vertex(vptr,slot,3,NULL);				// start with a PU to the start of the polygon
 		tool_tip_touch(lptr->touchdepth);			// touch tip to surface if requested
 		do{
+		  if(job.sync==TRUE){if(print_status(&local_job)==0)break;}	// check for pause/abort/etc.
 		  vptr=vptr->next;					// move onto next vertex
 		  if(vptr==NULL)break;					// handles "open" polygons like FILL
 		  vptr->z=0.000;					// just in case z value has not been updated
 		  vptr->i=0;						// default to not an overlap vector
 		  if(vector_count>=pptr->vert_qty)vptr->i=1;		// indicate that this is an overlap vector
 		  //vptr->attr=ptyp;
-		  if(local_job.state!=JOB_RUNNING)
-		    {
-		    memcpy(&job,&local_job,sizeof(job));		// update public copy with local data
-		    print_paused(0);					// abort if calibration failed
-		    memcpy(&local_job,&job,sizeof(job));		// update local copy with public data
-		    }
 		  print_vertex(vptr,slot,1,lptr);			// send PD deposit command to tinyG
 		  burst_ctr++;
 		  if(burst_ctr>=cmdBurst || vptr==pptr->vert_first)
@@ -2152,9 +2179,7 @@ void* build_job(void *arg)
       {
       printf("\n\nPrint: *** ERROR - no available tool! *** \n\n");
       local_job.state=JOB_ABORTED_BY_SYSTEM;						
-      memcpy(&job,&local_job,sizeof(job));				// ... update public copy with local data
-      print_paused(0);
-      memcpy(&local_job,&job,sizeof(job));				// ... update local copy with public data
+      if(print_status(&local_job)==0)break;				// process abort
       }
     if(aptr!=NULL)
       {if(aptr->next!=NULL)next_slot=(aptr->next)->ID;}			// init next tool slot
@@ -2200,12 +2225,11 @@ void* build_job(void *arg)
       printf("* Print:  z_cut=%6.3f  slot=%d   mz=%f  jz=%f  \n",z_cut,slot,mptr->current_z,local_job.current_z);
       printf("****************************************************************************\n\n");
       
-      if(local_job.state!=JOB_RUNNING)					// if anything other than running...
-        {
-	memcpy(&job,&local_job,sizeof(job));				// ... update public copy with local data
-	print_paused(0);						// ... go into pause
-	memcpy(&local_job,&job,sizeof(job));				// ... update local copy with public data
-	}
+      // check if user has hit pause or abort.  this is a fixed set of instructions to ideally
+      // process inside each loop of the build cycle, preferably at the top of each loop.
+      if(job.sync==TRUE){if(print_status(&local_job)==0)break;}		// check for pause/abort/etc.
+      if(local_job.state!=JOB_RUNNING)break;				// account for nested loop abort requests
+
       active_model=mptr;						// expose which model is in use globally to rest of system
       fidelity_mode_flag=FALSE;						// default to not in fidelity mode
       if(active_model->fidelity_mode==TRUE)fidelity_mode_flag=TRUE;	// turn on if this model calls for it
@@ -2221,6 +2245,9 @@ void* build_job(void *arg)
       aptr=mptr->oper_list;						// get the pointer to start of operations list for this model
       while(aptr!=NULL)							// loop thru all operations in sequence
 	{
+	if(job.sync==TRUE){if(print_status(&local_job)==0)break;}	// check for pause/abort/etc.
+	if(local_job.state!=JOB_RUNNING)break;				// account for nested loop abort requests
+	
 	// get the slot and corresponding slice pointer for this z level
 	printf("\n\nStart of operation:  %s  with tool  %d\n\n",aptr->name,aptr->ID);
 	if(strstr(aptr->name,"ADD_BASE_LAYER")!=NULL){aptr=aptr->next;continue;}// base layer already done above
@@ -2228,12 +2255,6 @@ void* build_job(void *arg)
 	if(slot<0 || slot>=MAX_TOOLS){aptr=aptr->next;continue;}		// skip if no operation defined or tool out of range
 	if(Tool[slot].state<TL_READY){local_job.state=JOB_PAUSED_DUE_TO_ERROR;}	// if user unplugs tool...
 	if(Tool[slot].state==TL_FAILED){local_job.state=JOB_PAUSED_DUE_TO_ERROR;}// if tool fails for some reason...
-	if(local_job.state!=JOB_RUNNING)					// if anything other than run...
-	  {
-	  memcpy(&job,&local_job,sizeof(job));					// ... update public copy with local data
-	  print_paused(0);							// ... go into pause
-	  memcpy(&local_job,&job,sizeof(job));					// ... update local copy with public data
-	  }
 
 	// get pointer to slice data. note that models are all sliced with their min at 0.000 and the z offset
 	// is compensated for later.  so the slice fetch must account for the z offset.  this is particularly
@@ -2340,9 +2361,15 @@ void* build_job(void *arg)
 	  mptr->active_copy=0;						// init total copy counter
 	  for(x_copy_ctr=0;x_copy_ctr<mptr->xcopies;x_copy_ctr++)	// loop thru all in X
 	    {
+	    if(job.sync==TRUE){if(print_status(&local_job)==0)break;}	// check for pause/abort/etc.
+	    if(local_job.state!=JOB_RUNNING)break;			// account for nested loop abort requests
+
 	    mptr->xoff[mtyp]=original_xoff+x_copy_ctr*(mptr->xmax[mtyp]-mptr->xmin[mtyp]+mptr->xstp);	// calc X offset
 	    for(y_copy_ctr=0;y_copy_ctr<mptr->ycopies;y_copy_ctr++)	// loop thru all in Y
 	      {
+	      if(job.sync==TRUE){if(print_status(&local_job)==0)break;}	// check for pause/abort/etc.
+	      if(local_job.state!=JOB_RUNNING)break;			// account for nested loop abort requests
+
 	      mptr->yoff[mtyp]=original_yoff+y_copy_ctr*(mptr->ymax[mtyp]-mptr->ymin[mtyp]+mptr->ystp);	// calc Y offset
 	      if(mptr->active_copy>=mptr->total_copies)continue;	// if beyond total copies...
 	      mptr->active_copy++;					// increment copy counter
@@ -2368,9 +2395,7 @@ void* build_job(void *arg)
 		  if(!ignore_tool_bit_change)
 		    {
 		    local_job.state=JOB_PAUSED_FOR_BIT_CHG;			// set job state to paused by system awaiting bit change
-		    memcpy(&job,&local_job,sizeof(job));			// ... update public copy with local data
-		    print_paused(DRILL);					// ... go into pause
-		    memcpy(&local_job,&job,sizeof(job));			// ... update local copy with public data
+		    if(print_status(&local_job)==0)break;
 		    }
 		  else 
 		    {
@@ -2390,9 +2415,7 @@ void* build_job(void *arg)
 			if(!ignore_tool_bit_change)
 			  {
 			  local_job.state=JOB_PAUSED_FOR_BIT_CHG;		// set job state to paused by system awaiting bit change
-			  memcpy(&job,&local_job,sizeof(job));			// ... update public copy with local data
-			  print_paused(DRILL);					// ... go into pause
-			  memcpy(&local_job,&job,sizeof(job));			// ... update local copy with public data
+			  if(print_status(&local_job)==0)break;
 			  }
 			}
 		      vptr->x=pptr->centx;
@@ -2410,12 +2433,7 @@ void* build_job(void *arg)
 			if(vold==pptr->vert_first)break;
 			}
 		      pre_drill_diam=pptr->diam;
-		      if(local_job.state!=JOB_RUNNING)
-		        {
-			memcpy(&job,&local_job,sizeof(job));			// ... update public copy with local data
-			print_paused(DRILL);					// ... go into pause
-			memcpy(&local_job,&job,sizeof(job));			// ... update local copy with public data
-			}
+		      if(job.sync==TRUE){if(print_status(&local_job)==0)break;}	// check for pause/abort/etc.
 		      }
 		    pptr=pptr->next;
 		    }
@@ -2425,9 +2443,7 @@ void* build_job(void *arg)
 		  make_toolchange(slot,1);					// make tool change to matl drive at start of every layer
 		  drill_holes_done_flag=1;					// all polys have already been drilled
 		  local_job.state=JOB_PAUSED_FOR_BIT_CHG;			// pause to allow bit change
-		  memcpy(&job,&local_job,sizeof(job));				// ... update public copy with local data
-		  print_paused(DRILL);						// ... go into pause
-		  memcpy(&local_job,&job,sizeof(job));				// ... update local copy with public data
+		  if(print_status(&local_job)==0)break;
 		  }
 		}
 	
@@ -2460,8 +2476,6 @@ void* build_job(void *arg)
 		  }
 		}
 		
-	    //while(!kbhit());
-		
 	      // draw polygons in line type sequence as defined by this operation in ToolName.XML using params in the MatlName.XLS.
 	      // a typcial sequence for an operation might be:  OFFSET, BORDER, FILL, LOWER_CO, UPPER_CO where those line types
 	      // are then defined in the MatlName.XML file.
@@ -2469,6 +2483,9 @@ void* build_job(void *arg)
 	      lt_ptr=optr->lt_seq;						// define line type ID and name...note this points to a generic list of linetypes (the sequence)
 	      while(lt_ptr!=NULL)						// loop through all line types identified in the model's deposition sequence
 		{
+		if(job.sync==TRUE){if(print_status(&local_job)==0)break;}	// check for pause/abort/etc.
+		if(local_job.state!=JOB_RUNNING)break;				// account for nested loop break request
+
 		pre_matl[slot]=Tool[slot].matl.mat_used;			// save amt of mat used at start of this line type
 		ptyp=lt_ptr->ID;						// get linetype ID
 		//if(ptyp==SPT_BORDER || ptyp==SPT_OFFSET){lt_ptr=lt_ptr->next;continue;}	// skip support contours
@@ -2510,6 +2527,9 @@ void* build_job(void *arg)
 		adjflow_flag=TRUE;						// turn on flag to adjust flow rate around tight corners
 		while(pptr!=NULL)						// while we still have polygons to process
 		  {
+		  if(job.sync==TRUE){if(print_status(&local_job)==0)break;}	// check for pause/abort/etc.
+		  if(local_job.state!=JOB_RUNNING)break;			// account for nested loop break request
+		  
 		  if(pptr->hole==2){pptr=pptr->next;continue;}			// if a drilled hole, then skip it - it was done above
 		  if(ptyp==MDL_PERIM && pptr->perim_type==2)			// if custom settings for this poly need to be applied...
 		    {if(pptr->perim_lt!=NULL)lptr=pptr->perim_lt;}		// ... reset line type pointer to one specific to this poly
@@ -2593,6 +2613,8 @@ void* build_job(void *arg)
 
 		  // loop thru all vtxs of this polygon
 		  do{
+		    if(job.sync==TRUE){if(print_status(&local_job)==0)break;}	// check for pause/abort/etc.
+		    
 		    vector_count++;						// increment vector count
 		    vptr_p0=vptr_p1;						// save pre-prev vertex position
 		    vptr_p1=vptr;						// save previous vertex position
@@ -2613,17 +2635,6 @@ void* build_job(void *arg)
 		      memset(gcode_burst,0,sizeof(gcode_burst));		// ... null out burst string
 		      burst_ctr=0;						// ... reset burst count down counter
 		      cmdBurst=1;
-		      }
-		    if(local_job.state!=JOB_RUNNING)				// hover here if paused for any reason...
-		      {
-		      pause_vtx=vptr;						// ... define location of pause
-		      on_part_flag=FALSE;					// ... set to indicate moving off part
-		      memcpy(&job,&local_job,sizeof(job));			// ... update public copy with local data
-		      print_paused(ptyp);					// ... go into pause
-		      memcpy(&local_job,&job,sizeof(job));			// ... update local copy with public data
-		      if(local_job.state!=JOB_RUNNING)break;			// ... if not back to running, exit the vertex loop immediately
-		      memset(gcode_burst,0,sizeof(gcode_burst));		// ... null out burst string
-		      on_part_flag=TRUE;					// ... set to indicate back on part
 		      }
 		    }while(vector_count<(pptr->vert_qty+vtx_overlap));		// stop after drawing all vectors and then some to cover start/stop seam
 		   
@@ -2738,9 +2749,8 @@ void* build_job(void *arg)
 	    
 	    // go into pause where user can select any polygons to re-run
 	    local_job.state=JOB_PAUSED_BY_CMD;
-	    memcpy(&job,&local_job,sizeof(job));			// ... update public copy with local data
-	    print_paused(1);						// ... go into pause
-	    memcpy(&local_job,&job,sizeof(job));			// ... update local copy with public data
+	    if(job.sync==TRUE){if(print_status(&local_job)==0)break;}	// check for pause/abort/etc.
+	    if(local_job.state!=JOB_RUNNING)break;
 	    pause_at_end_of_layer=FALSE;
 	    rerun_flag=FALSE;						// default to not re-run
 	    if(p_pick_list!=NULL)rerun_flag=TRUE;			// if user selected polygons for reprint... then re-run
@@ -2847,16 +2857,15 @@ void* build_job(void *arg)
 	printf("Next model/slice:  zcut=%f  mptr=%X  mptr->z=%f  zoff=%f \n\n",	z_cut,mptr,mptr->current_z,mptr->zoff[MODEL]);
 	}
 	
-      local_job.current_z=z_cut;						// new z_cut set by job_layer_seek function
+      local_job.current_z=z_cut;					// new z_cut set by job_layer_seek function
       if(mptr==NULL)
         {
 	if(local_job.current_z<(ZMax-local_job.min_slice_thk))
 	  {
 	  printf("\nJob_layer_seek did not return a model pointer. \n\n"); 
 	  local_job.state=JOB_PAUSED_DUE_TO_ERROR;
-	  memcpy(&job,&local_job,sizeof(job));					// ... update public copy with local data
-	  print_paused(1);							// ... go into pause
-	  memcpy(&local_job,&job,sizeof(job));					// ... update local copy with public data
+	  if(print_status(&local_job)==0)break;				// check for pause/abort/etc.
+	  if(local_job.state!=JOB_RUNNING)break;
 	  }
 	}
       first_model_flag=FALSE;
@@ -2942,6 +2951,14 @@ void* build_job(void *arg)
 	  
 	}
 	
+      // update public job information
+      job.state=local_job.state;
+      job.current_z=local_job.current_z;
+      job.current_dist=local_job.current_dist;
+      job.total_dist=local_job.total_dist;
+      job.penup_dist=local_job.penup_dist;
+      job.pendown_dist=local_job.pendown_dist;
+
       // determine if the job is done by comparing new z height to the job max/min z height
       //if(local_job.current_z<=ZMin || local_job.current_z>=ZMax)break;		// <- need to acct for target in ZMin/ZMax for this to work
       if(local_job.type==ADDITIVE && local_job.current_z>=ZMax){local_job.state=JOB_COMPLETE; break;}
@@ -2968,7 +2985,12 @@ void* build_job(void *arg)
     //save_unit_state();
     if(save_logfile_flag==TRUE)close_job_log();				// if saving logfile, close it here
     fclose(print_log);
-    memcpy(&job,&local_job,sizeof(job));				// ... update public copy with local data
+    job.state=local_job.state;
+    job.current_z=local_job.current_z;
+    job.current_dist=local_job.current_dist;
+    job.total_dist=local_job.total_dist;
+    job.penup_dist=local_job.penup_dist;
+    job.pendown_dist=local_job.pendown_dist;
     printf("Printing complete.  Now idle.\n\n");
     }	// end of WHILE loop
     
