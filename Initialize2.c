@@ -1227,6 +1227,7 @@ int init_general(void)
     fct_pick_ref=NULL;							// no facet in pick list
     active_model=NULL;							// no model is active
     set_start_at_crt_z=FALSE;						// start at model top/btm
+    vtx_last_printed=vertex_make();					// create space to hold vtx for pause/resume
     
     // init debugging params
     vtx_debug=vertex_make();

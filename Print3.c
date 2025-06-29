@@ -723,6 +723,7 @@ int print_status(jobx *local_job)
 {
   char		proc_scratch[255];
   char 		gcode_rtn[255];
+  int		old_job_state;
   int		i,j,tool_at_pause;
   int		pwm_lo,pwm_hi,pwm_at_pause,prev_air_status;
   float		XPause,YPause,ZPause;
@@ -737,7 +738,7 @@ int print_status(jobx *local_job)
   job.penup_dist=local_job->penup_dist;
   job.pendown_dist=local_job->pendown_dist;
 
-  // now determine why we wound up here.  if it was by a UI request, then we want to
+  // now determine how we wound up here.  if it was by a UI request, then we want to
   // push the current job state into the local job state.  if it was by a problem
   // encountered in the build_job function then we want to push the local job state
   // into the public job state.
@@ -767,7 +768,6 @@ int print_status(jobx *local_job)
   tool_matl_retract(tool_at_pause,Tool[tool_at_pause].matl.retract);	// retract material before tip lift
   tool_tip_retract(tool_at_pause);					// lift tool tip
   tool_air(tool_at_pause,OFF);						// turn air off
-  on_part_flag=FALSE;							// set to indicate leaving part
 
   // address tools that require attention while still at build table
   if(Tool[tool_at_pause].tool_ID==TC_LASER)				 // ... turn off laser power
@@ -778,6 +778,7 @@ int print_status(jobx *local_job)
     }
   
   // since other moves (like tool bit changes) can happen, all relative moves must be zero-ed out immediately
+  on_part_flag=FALSE;							// set to indicate leaving part
   goto_machine_home();
   
   // address tools that require attention after they have left the build table
@@ -787,11 +788,12 @@ int print_status(jobx *local_job)
     }
 
   // wait in this loop until the job state is changed by user
-  while(job.state!=JOB_RUNNING)
+  old_job_state=job.state;
+  while(job.state==old_job_state)					// while nothing has changed...
     {
-    print_thread_alive=1;
-    g_main_context_iteration(NULL, FALSE);
-    delay(100);
+    print_thread_alive=1;						// still alive
+    g_main_context_iteration(NULL, FALSE);				// poll for UI changes
+    delay(100);								// don't hammer system with this loop
     }
    
   // resume once user changes state back to running
@@ -822,7 +824,8 @@ int print_status(jobx *local_job)
       //while(Tool[tool_at_pause].thrm.heat_status==OFF);
       }
     }
-  // handle everything else but a return to job running
+  // handle everything else but a return to job running.  the state will be handled
+  // by the function this is returning to.
   else 
     {
     local_job->state=job.state; 					// push user job state into local job state
@@ -1277,7 +1280,7 @@ int motion_complete(void)
     sprintf(gcode_cmd,"{\"qr\":null}\n");				// req buffer report
     tinyGSnd(gcode_cmd);						// send request
     while(tinyGRcv(0)==0);						// get tinyg feedback - this will update position if moving
-    if(bufferAvail==MAX_BUFFER)break;					// leave as soon as possible
+    if((MAX_BUFFER-bufferAvail)<2)break;				// leave as soon as possible
     
     // calc change in position. if any change reset start time
     dx=fabs(oldx-PostG.x); dy=fabs(oldy-PostG.y);			// calc change in position
@@ -2762,8 +2765,7 @@ void* build_job(void *arg)
 	    
 	    // go into pause where user can select any polygons to re-run
 	    local_job.state=JOB_PAUSED_BY_CMD;
-	    if(job.sync==TRUE){if(print_status(&local_job)==0)break;}	// check for pause/abort/etc.
-	    if(local_job.state!=JOB_RUNNING)break;
+	    if(print_status(&local_job)==0)break;			// check for anything other than JOB_RUNNING
 	    pause_at_end_of_layer=FALSE;
 	    rerun_flag=FALSE;						// default to not re-run
 	    if(p_pick_list!=NULL)rerun_flag=TRUE;			// if user selected polygons for reprint... then re-run

@@ -2553,6 +2553,7 @@ static void abort_job( GtkWidget *btn, gpointer user_data )
     {
     sprintf(scratch,"Job aborted by user.");
     entry_system_log(scratch);
+    
     // remove any model data from memory
     mptr=job.model_first;
     while(mptr!=NULL)
@@ -2991,7 +2992,7 @@ gboolean layer_draw_callback (GtkWidget *widget, cairo_t *cr, gpointer data)
 	  sprintf(scratch,"frst=%X  last=%X  sptr=%X ID=%d slc_z=%f z_cut=%f zoff=%f ",mptr->slice_first[0],mptr->slice_last[0],sptr,sptr->ID,sptr->sz_level,slc_z_cut,mptr->zoff[MODEL]);
 	  set_color(cr,&color,MD_RED);
 	  newx=LVgxoffset+LVview_scale*(5);
-	  newy=0-(LVgyoffset+LVview_scale*(5));
+	  newy=0-(LVgyoffset+LVview_scale*(5))-20;
 	  cairo_move_to(cr,newx,newy);
 	  cairo_show_text (cr, scratch);
 	  cairo_move_to(cr,newx,newy);
@@ -8599,11 +8600,7 @@ void model_view_callback (GtkWidget *btn, gpointer user_data)
     mptr->MRedraw_flag=TRUE;
     mptr=mptr->next;
     }
-  
-  set_auto_zoom=TRUE;
-  job_maxmin();
-  gtk_widget_queue_draw(win_main);
-  while (g_main_context_iteration(NULL, FALSE));			// update display promptly
+
   return;
 }
 
@@ -9993,7 +9990,8 @@ static gboolean on_idle_status_poll(GtkWidget *hbox)
 
 	// block comment this IF statement when programming new memories
 	
-	// if a 1-wire device was found...
+	// if a tool memory or tool file was found...
+	// ... load tool params, material params, set build table temp
 	if(strlen(Tool[slot].mmry.dev)>8)				// check if 1wire has been identified for this tool
 	  {
 	  for(i=0;i<3;i++)						// 1wires are notorously sketchy... attempt to read 3 times
@@ -10044,8 +10042,10 @@ static gboolean on_idle_status_poll(GtkWidget *hbox)
 		  if(Tool[slot].thrm.bedtC > Tool[BLD_TBL1].thrm.setpC)
 		    {
 		    Tool[BLD_TBL1].thrm.setpC = Tool[slot].thrm.bedtC;
+		    Tool[BLD_TBL1].thrm.operC = Tool[slot].thrm.bedtC;
 		    Tool[BLD_TBL1].thrm.bedtC = Tool[slot].thrm.bedtC;
 		    Tool[BLD_TBL2].thrm.setpC = Tool[slot].thrm.bedtC;
+		    Tool[BLD_TBL2].thrm.operC = Tool[slot].thrm.bedtC;
 		    Tool[BLD_TBL2].thrm.bedtC = Tool[slot].thrm.bedtC;
 		    Tool[BLD_TBL1].thrm.sync = TRUE;			// force thermal thread to update to new values
 		    Tool[BLD_TBL2].thrm.sync = TRUE;
@@ -10205,7 +10205,6 @@ static gboolean on_idle_status_poll(GtkWidget *hbox)
 	    for(i=0;i<MAX_THERMAL_DEVICES;i++)				// ... cycle thru all devices
 	      {
 	      if(Tool[i].state<TL_LOADED)continue;			// ... if not loaded, skip it
-	      if(Tool[i].pwr24==FALSE)continue;				// ... if not thermal, skip it
 	      Tool[i].thrm.setpC=Tool[i].thrm.backC;			// ... reset temp to setback temp for ALL tools
 	      }
 	    }
@@ -10216,7 +10215,6 @@ static gboolean on_idle_status_poll(GtkWidget *hbox)
 	    for(i=0;i<MAX_THERMAL_DEVICES;i++)				// ... cycle thru all devices
 	      {
 	      if(Tool[i].state<TL_LOADED)continue;			// ... if not loaded, skip it
-	      if(Tool[i].pwr24==FALSE || Tool[i].thrm.sensor<=0)continue;	// ... if not thermal, skip it
 	      Tool[i].thrm.setpC=Tool[i].thrm.operC;			// ... reset temp to operating temp for ALL tools
 	      }
 	    }
@@ -11106,7 +11104,8 @@ static gboolean on_idle_status_poll(GtkWidget *hbox)
     
     // update tool view params for single head units
     // other units don't have the screen space the way the gammas do
-    if(MAX_TOOLS==1)
+    // only update when running otherwise it deminishes averages while idle
+    if(MAX_TOOLS==1 && main_view_page==VIEW_TOOL && job.state==JOB_RUNNING)
       {
       // if a new layer, reset stats
       if(fabs(job.current_z-old_jobz)>=CLOSE_ENOUGH)

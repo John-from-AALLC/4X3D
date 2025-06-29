@@ -1088,7 +1088,10 @@ int job_clear(void)
   LVgyoffset=(-530); 
   
   // clear job display
-  for(i=0;i<MAX_THERMAL_DEVICES;i++)gtk_label_set_text(GTK_LABEL(mdl_desc[i]),"Empty     ");
+  //if(main_view_page==VIEW_TOOL)
+  //  {
+  //  for(i=0;i<MAX_THERMAL_DEVICES;i++)gtk_label_set_text(GTK_LABEL(mdl_desc[i]),"Empty     ");
+  //  }
 
   sprintf(scratch,"Job cleared.");
   entry_system_log(scratch);

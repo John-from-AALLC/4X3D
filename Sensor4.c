@@ -431,7 +431,8 @@ int build_table_line_laser_scan(void)
   
   
   // initialize
-  job.state=JOB_TABLE_SCAN;;
+  job.state=JOB_TABLE_SCAN;
+  job.sync=TRUE;
   build_table_scan_flag=1;					// reset to "needs to be mapped to model" if this is a re-scan
   display_model_flag=TRUE;
   vstart=vertex_make();
@@ -697,6 +698,8 @@ int build_table_step_scan(int slot, int sensor_type)
   make_toolchange(slot,1);
   
   // loop thru table grid to collect z level moving from y low to y high
+  // note that this is NOT a separate printing thread - this operates via the main thread
+  // which means direct controls of the job data struct effect it directly.
   for(h=ystr;h<=ymax;h++)
     {
 	
@@ -936,6 +939,7 @@ int build_table_sweep_scan(int slot, int sensor_type)
   // initialize
   win_testUI_flag=TRUE;
   job.state=JOB_RUNNING;
+  job.sync=TRUE;
   build_table_scan_flag=1;					// reset to "needs to be mapped to model" if this is a re-scan
   win_settingsUI_flag=FALSE;
   display_model_flag=TRUE;
@@ -1245,6 +1249,7 @@ int build_table_centerline_scan(int slot, int sensor_type)
     
   // initialize
   job.state=JOB_RUNNING;
+  job.sync=TRUE;
   build_table_scan_flag=1;						// reset to "needs to be mapped to model" if this is a re-scan
   win_settingsUI_flag=FALSE;						// turn off to not conflict with thermal thread
   display_model_flag=TRUE;						// turn on to see result in model view

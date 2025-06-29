@@ -1221,7 +1221,6 @@ extern cmdBuffer		cmd_buffer[MAX_BUFFER];			// holds FIFO index of commands sent
   extern int	Superimpose_flag;					// superimpose 3D geometry over camera image flag
   extern int	Perspective_flag;					// view 3D geometry with depth perspective flag
 
-
 // 2D Layer viewing
   extern float 	LVview_scale;						// scale factor for viewing slices
   extern float 	LVdisp_spin,LVdisp_tilt;				// spin and tilt factors for Layer Viewing
@@ -1330,7 +1329,7 @@ extern int	init_done_flag;
 extern int	gpio_ready_flag;					// flag to indicate gpio can be used
 extern int	carriage_at_home;					// flag to indicate if carriage at home position
 extern int	on_part_flag;						// flag to indicate if tool is working on part
-extern vertex 	*pause_vtx;						// model vtx at which pause occured
+extern vertex	*vtx_last_printed;
 extern vertex 	*vtx_debug;
 extern vertex 	*vmid,*vlow,*vhgh;
 extern vector	*vec_debug;
