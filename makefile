@@ -20,7 +20,7 @@ LIBS = -lpigpio -lm -pthread `pkg-config --libs gtk4` -lgtk-4 -lvulkan
 CFLAGS += -I/usr/include -I/usr/local/include -L/usr/lib `pkg-config --cflags gtk4 gstreamer-1.0`
 
 #Set the compiler you are using ( gcc for C or g++ for C++ )
-CC = gcc
+CC = gcc -g -O0
 
 #Set the filename extensiton of your C files (e.g. .c or .cpp )
 EXTENSION = .c
