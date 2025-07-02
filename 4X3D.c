@@ -26,8 +26,8 @@
 
 // Defines for version control
 #define AA4X3D_MAJOR_VERSION 0
-#define AA4X3D_MINOR_VERSION 625
-#define AA4X3D_MICRO_VERSION 2
+#define AA4X3D_MINOR_VERSION 702
+#define AA4X3D_MICRO_VERSION 1
 
 // Defines for math
 #define PI 3.14159
@@ -434,6 +434,12 @@
   #define TOOL_C_LOOP 25
   #define TOOL_D_LOOP 25
 #endif
+
+// TinyG interface
+#define HOLDING_TQ_ALWAYS_OFF 0
+#define HOLDING_TQ_ALWAYS_ON 1
+#define HOLDING_TQ_IN_CYCLE 2
+#define HOLDING_TQ_IN_MOVE 3
 
 // Thermal sensor defines
 #define ONEWIRE 1							// 1wire temp sensor... cannot get very hot
@@ -1425,7 +1431,7 @@ float 		ss_wavefront_increment=0.025;
 float 		ss_wavefront_maxdist=2.0;
 float 		ss_wavefront_crtdist=0.025;
 float 		max_colinear_angle=3.00;
-float 		min_vector_length=0.10;
+float 		min_vector_length=0.25;
 int		nonboolean_input=FALSE;
 float	 	max_support_facet_len=25.0;				// mm
 int		max_vtxs_per_polygon=5000;
@@ -1823,8 +1829,9 @@ void update_size_values(model *mnew);
 // Functions located in Model_Data.c
 int memory_status(void);
 vertex *vertex_make(void);
-int vertex_insert(model *mptr, vertex *local, vertex *vertexnew, int typ);	// inserts a vertex into a model
+int vertex_insert(model *mptr, vertex *local, vertex *vertexnew, int typ);
 vertex *vertex_unique_insert(model *mptr, vertex *local, vertex *vertexnew, int typ, float tol);
+int vertex_destroy(vertex *vdel);
 int vertex_delete(model *mptr, vertex *vdel);
 int vertex_redundancy_check(vertex *vtxlist);
 vertex *vertex_copy(vertex *vptr, vertex *vnxt);
@@ -1844,15 +1851,18 @@ vertex *vertex_match_ID(vertex *vtest,polygon *pA);
 vertex *vertex_previous(vertex *vtest,polygon *pA);
 vertex_list *vertex_neighbor_list(vertex *vinpt);
 vertex_list *vertex_list_make(vertex *vinpt);
+int vertex_list_destroy(vertex_list *vl_del);
 vertex_list *vertex_list_manager(vertex_list *vlist, vertex *vinpt, int action);
 vertex *vertex_list_add_unique(vertex_list *vl_inpt, vertex *vtx_inpt);
 
 edge *edge_make(void);
-edge *edge_copy(edge *einp);
 int edge_insert(model *mptr, edge *local, edge *edgenew, int typ);
+int edge_destroy(edge *edel);
 int edge_delete(model *mptr, edge *edel, int typ);
 int edge_purge(edge *elist);
+edge *edge_copy(edge *einp);
 edge_list *edge_list_make(edge *einpt);
+int edge_list_destroy(edge_list *el_del);
 edge_list *edge_list_manager(edge_list *elist, edge *einpt, int action);
 edge *edge_angle_id(edge *inp_edge_list, float inp_angle);		// creates edge list base on neighboring facet angles
 int edge_compare(edge *A, edge *B);
@@ -1863,6 +1873,7 @@ int edge_dump(model *mptr);
 
 facet *facet_make(void);
 int facet_insert(model *mptr, facet *local, facet *facetnew, int typ);
+int facet_destroy(facet *fdel);
 int facet_delete(model *mptr, facet *fdel, int typ);
 int facet_purge(facet *flist);
 int facet_normal(facet *finp);
@@ -1945,6 +1956,7 @@ int job_build_tree_support(void);
 vector *vector_make(vertex *A, vertex *B, int typ);			// allocates memory for a single vector
 int vector_insert(slice *sptr, int ptyp, vector *vecnew);		// inserts a single vector into linked list
 int vector_raw_insert(slice *sptr, int ptyp, vector *vecnew);
+int vector_destroy(vector *vecdel, int vtx_ends);
 vector *vector_delete(vector *veclist, vector *vdel);			// deletes a single vector from linked list
 vector *vector_wipe(vector *vec_list, int del_typ);
 vector *vector_copy(vector *vec_src);
@@ -2786,6 +2798,23 @@ gboolean layer_draw_callback (GtkWidget *widget, cairo_t *cr, gpointer data)
   sprintf(scratch,"Y");
   if(cnc_profile_cut_flag==TRUE)sprintf(scratch,"Z");
   cairo_show_text(cr,scratch);
+  cairo_stroke(cr);
+  
+  // draw "FRONT" to keep user oriented
+  set_color(cr,&color,DK_RED);
+  color.alpha=0.60;gdk_cairo_set_source_rgba (cr,&color);
+  x1=BUILD_TABLE_LEN_X+10;  y1=(BUILD_TABLE_LEN_Y/2)-15;		// front is at max X, center text along Y
+  for(i=0;i<5;i++)
+    {
+    if(i==0)sprintf(scratch,"F");
+    if(i==1)sprintf(scratch,"R");
+    if(i==2)sprintf(scratch,"O");
+    if(i==3)sprintf(scratch,"N");
+    if(i==4)sprintf(scratch,"T");
+    cairo_move_to(cr,LVgxoffset+LVview_scale*x1,0-(LVgyoffset+LVview_scale*y1));
+    cairo_show_text(cr,scratch);
+    y1 -= 10;
+    }
   cairo_stroke(cr);
 
   // DEBUG - draw xy map of objects on build table
@@ -3907,7 +3936,7 @@ gboolean layer_draw_callback (GtkWidget *widget, cairo_t *cr, gpointer data)
       }
     
   // release temporary vtx
-  free(vpos); vertex_mem--;
+  vertex_destroy(vpos);
 
   return(TRUE);
 }
@@ -3990,7 +4019,7 @@ static gboolean on_layer_area_left_button_press_event(GtkGestureClick *gesture, 
 	}
       
       // clear memory 
-      for(i=0;i<4;i++){free(vscr[i]); vertex_mem--;}
+      for(i=0;i<4;i++){vertex_destroy(vscr[i]);}
       if(windnum==TRUE){mpick=mptr; break;}
 
       mptr=mptr->next;
@@ -4302,7 +4331,7 @@ static gboolean on_layer_area_left_button_press_event(GtkGestureClick *gesture, 
 	  vecptr=vecptr->next;
 	  if(vecptr==sptr->perim_vec_first[MDL_PERIM])break;
 	  }
-	free(vtxint); vertex_mem--; vtxint=NULL;
+	vertex_destroy(vtxint); vtxint=NULL;
 	}
       else 
         {
@@ -4410,7 +4439,7 @@ static gboolean on_layer_area_left_button_press_event(GtkGestureClick *gesture, 
 	    }
 	  vl_ptr=vl_ptr->next;
 	  }
-	free(vtxint); vertex_mem--; vtxint=NULL;
+	vertex_destroy(vtxint); vtxint=NULL;
 	}
 
       // ensure vector search list is empty
@@ -4460,7 +4489,7 @@ static gboolean on_layer_area_left_button_press_event(GtkGestureClick *gesture, 
     vtx_pick_ref->x=(float)((x-LVgxoffset)/LVview_scale);
     vtx_pick_ref->y=(float)((0-y-LVgyoffset)/LVview_scale);
 
-    if(vptr!=NULL){free(vptr); vertex_mem--; vptr=NULL;}
+    if(vptr!=NULL){vertex_destroy(vptr); vptr=NULL;}
       
     return(TRUE);
 }
@@ -5014,6 +5043,29 @@ gboolean model_draw_callback (GtkWidget *widget, cairo_t *cr, gpointer data)
       cairo_stroke(cr);
     }
     
+    // draw "FRONT" to keep user oriented
+    {
+      set_color(cr,&color,DK_RED);
+      color.alpha=0.60;gdk_cairo_set_source_rgba (cr,&color);
+      x1=BUILD_TABLE_LEN_X+10;
+      y1=0-(BUILD_TABLE_LEN_Y/2-7);
+      z1=(-20);		
+      for(i=0;i<5;i++)
+	{
+	zl=1+(600 + (MVview_scale*(x1-MVdisp_cen_x))*oss - (MVview_scale*(y1-MVdisp_cen_y))*osc + (MVview_scale*(z1-MVdisp_cen_z))*ots)/600*pers_scale;
+	hl=((MVview_scale*(x1-MVdisp_cen_x))*osc+(MVview_scale*(y1-MVdisp_cen_y))*oss)/zl+MVgxoffset;
+	vl=((MVview_scale*(x1-MVdisp_cen_x))*oss*ots-(MVview_scale*(y1-MVdisp_cen_y))*osc*ots+(MVview_scale*(z1-MVdisp_cen_z))*otc)/zl+MVgyoffset;
+	if(i==0)sprintf(scratch,"F");
+	if(i==1)sprintf(scratch,"R");
+	if(i==2)sprintf(scratch,"O");
+	if(i==3)sprintf(scratch,"N");
+	if(i==4)sprintf(scratch,"T");
+	cairo_move_to(cr,hl,vl);
+	cairo_show_text(cr,scratch);
+	y1 -= 10;
+	}
+      cairo_stroke(cr);
+    }
 
     // abort here if not ready to display model yet
     if(display_model_flag==FALSE)
@@ -5465,8 +5517,8 @@ gboolean model_draw_callback (GtkWidget *widget, cairo_t *cr, gpointer data)
 		  if(fptr!=NULL)fptr=fptr->next;
 		  }
 		  
-		free(ViewVec); vector_mem--;
-		free(Avec); vector_mem--;
+		vector_destroy(ViewVec,FALSE);
+		vector_destroy(Avec,FALSE);
 		}
 		
 	      // display SUPPORT upper and lower patch facets
@@ -6497,12 +6549,12 @@ gboolean model_draw_callback (GtkWidget *widget, cairo_t *cr, gpointer data)
         }	// end of for mtyp=MODEL loop
       mptr=mptr->next;							// and go on to next model
       }
-    free(vtx_ctr); 	vertex_mem--;
-    free(Vvtx);		vertex_mem--;
-    free(Avtx);		vertex_mem--;
-    free(Basevtx);	vertex_mem--;
-    free(vwpt);		vertex_mem--;
-    free(vtool_pos); 	vertex_mem--;
+    vertex_destroy(vtx_ctr);
+    vertex_destroy(Vvtx);
+    vertex_destroy(Avtx);
+    vertex_destroy(Basevtx);
+    vertex_destroy(vwpt);
+    vertex_destroy(vtool_pos);
 
     return(TRUE);							// stop propagation of the draw signal here
 }
@@ -6587,7 +6639,7 @@ static gboolean on_model_area_left_button_press_event(GtkGestureClick *gesture, 
 	  }
 	
 	// clear memory 
-	for(i=0;i<4;i++){free(vscr[i]); vertex_mem--;}
+	for(i=0;i<4;i++){vertex_destroy(vscr[i]);}
 	if(windnum==TRUE){mpick=mptr; break;}
 	
 	mptr=mptr->next;
@@ -6680,7 +6732,7 @@ static gboolean on_model_area_left_button_press_event(GtkGestureClick *gesture, 
 	      }
 	    fptr=fptr->next;
 	    }
-	  free(posptr); vertex_mem--;
+	  vertex_destroy(posptr);
 
 	  fptr=mptr->facet_first[SUPPORT];
 	  if(set_view_supports==FALSE)fptr=NULL;
@@ -6704,7 +6756,7 @@ static gboolean on_model_area_left_button_press_event(GtkGestureClick *gesture, 
 	      }
 	    fptr=fptr->next;
 	    }
-	  free(posptr); vertex_mem--;
+	  vertex_destroy(posptr);
 	  }
 	 
 	mptr=mptr->next;
@@ -8583,6 +8635,8 @@ void model_view_callback (GtkWidget *btn, gpointer user_data)
 {
   model 	*mptr;
   
+  printf("\nmodel_view_callback:  job.count=%d  job.model_first=%X \n",job.model_count,job.model_first);
+  
   if(MVview_click==0)
     {MVview_scale=1.2; MVgxoffset=425; MVgyoffset=375; MVdisp_spin=(-37*PI/180); MVdisp_tilt=(210*PI/180);}
   if(MVview_click==1)
@@ -8590,7 +8644,7 @@ void model_view_callback (GtkWidget *btn, gpointer user_data)
   if(MVview_click==2)
     {MVview_scale=1.5; MVgxoffset=425; MVgyoffset=475; MVdisp_spin=(270*PI/180); MVdisp_tilt=(180*PI/180);}
   if(MVview_click==3)
-    {MVview_scale=1.5; MVgxoffset=425; MVgyoffset=250; MVdisp_spin=(0*PI/180);  MVdisp_tilt=(270*PI/180);}
+    {MVview_scale=1.4; MVgxoffset=425; MVgyoffset=250; MVdisp_spin=(0*PI/180);  MVdisp_tilt=(270*PI/180);}
   MVview_click++;
   if(MVview_click>3)MVview_click=0;
 
@@ -8647,7 +8701,7 @@ void clear_callback (GtkWidget *btn, gpointer user_data)
       {
       vecdel=vecptr;
       vecptr=vecptr->next;
-      free(vecdel);vector_mem--;
+      vector_destroy(vecdel,FALSE);
       if(vecptr==vec_debug)break;
       }
     vec_debug=NULL;
@@ -9624,7 +9678,7 @@ void norms_callback (GtkWidget *btn, gpointer user_data)
       if(ftest!=fbase && vector_facet_intersect(ftest,vecA,NULL)==TRUE)wind++;
       ftest=ftest->next;
       }
-    free(vecA);vector_mem--;
+    vector_destroy(vecA);
     
     // if the wind number is odd, then must reverse normal
     if(wind%2!=0)
@@ -9637,7 +9691,7 @@ void norms_callback (GtkWidget *btn, gpointer user_data)
     fbase=fbase->next;
     }
 
-  free(vtxB);vertex_mem--;
+  vertex_destroy(vtxB);
   //mptr->edge_spt_upper=edge_angle_id(mptr->edge_first,max_spt_angle);
 */
 
@@ -9838,6 +9892,8 @@ static void on_nb_page_switch (GtkWidget *g_notebook, GtkWidget *page, gint page
   // copy page number to global for settings page call.  see also #defines for this.
   // 0=VIEW_MODEL  1=VIEW_TOOL  2=VIEW_LAYER  3=VIEW_GRAPH  4=VIEW_CAMERA  5=VIEW_VULKAN
   main_view_page=page_num;
+
+  idle_start_time=time(NULL);						// reset idle time
   
   return;
 }
@@ -10976,6 +11032,9 @@ static gboolean on_idle_status_poll(GtkWidget *hbox)
       sprintf(idl_scratch," Aborted by user request ");
       if(strlen(job_status_msg)<(sizeof(job_status_msg)-strlen(idl_scratch))){strcat(job_status_msg,idl_scratch);}
       else {sprintf(job_status_msg,"%s",idl_scratch);}
+
+      sprintf(idl_scratch,"Job Aborted");
+      gtk_frame_set_label(GTK_FRAME(frame_time_box),idl_scratch);
       }
     
     // update temperatures in tool temperature offset if up

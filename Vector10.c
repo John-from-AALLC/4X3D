@@ -64,6 +64,21 @@ int vector_raw_insert(slice *sptr, int ptyp, vector *vecnew)
   return(TRUE);
 }
 
+// Function to destory a vector
+// Inputs:  vecdel=vector to free, end_vtxs:FALSE=leave tip and tail alone, TRUE=destroy tip and tail too
+int vector_destroy(vector *vecdel, int end_vtxs)
+{
+  if(vecdel==NULL)return(FALSE);
+  if(end_vtxs==TRUE)
+    {
+    if(vecdel->tip!=NULL)vertex_destroy(vecdel->tip); 
+    if(vecdel->tail!=NULL)vertex_destroy(vecdel->tail); 
+    }
+  free(vecdel);
+  vector_mem--;
+  return(TRUE);
+}
+
 // Function to delete a vector from the vector list and out of memory.
 vector *vector_delete(vector *veclist, vector *vdel)
 {
@@ -86,9 +101,7 @@ vector *vector_delete(vector *veclist, vector *vdel)
     if(vpre!=NULL)vpre->next=vnxt;
     if(vnxt!=NULL)vnxt->prev=vpre;
     }
-  if(vdel->tip!=NULL) free(vdel->tip);  vertex_mem--;
-  if(vdel->tail!=NULL)free(vdel->tail); vertex_mem--;
-  free(vdel); vector_mem--;	
+  vector_destroy(vdel,TRUE);
   
   return(newlist);
 }
@@ -110,11 +123,7 @@ vector *vector_wipe(vector *vec_list, int del_typ)
       if(vecptr==vec_list)new_vec_list=vecptr->next;			// if first vector in list, redefine start of list
       vecdel=vecptr;							// save address of vector to delete
       vecptr=vecptr->next;						// move our loop pointer forward
-      vdel=vecdel->tip;							// delete the tip vertex
-      free(vdel);vertex_mem--;
-      vdel=vecdel->tail;						// delete the tail vertex
-      free(vdel);vertex_mem--;			
-      free(vecdel);vector_mem--;					// delete the vector itself
+      vector_destroy(vecdel,TRUE);
       if(vecptr=vec_list)break;
       }  
     else 								// otherwise, if not marked to delete...
@@ -197,6 +206,8 @@ vector *vector_colinear_merge(vector *vec_first, int ptyp, float delta)
   vertex	*vptip,*vptail,*vctip,*vctail,*vntip,*vntail,*del_tail,*del_tip;
   vector 	*vecpre,*vecptr,*vecnxt,*veclast;
 
+  //debug_flag=76;
+  
   // validate inputs
   if(vec_first==NULL)return(NULL);
   if(ptyp<0 || ptyp>MAX_LINE_TYPES)return(vec_first);
@@ -282,15 +293,15 @@ vector *vector_colinear_merge(vector *vec_first, int ptyp, float delta)
 	vecptr->angle=vector_absangle(vecptr);				// ... re-calc new vector angle
 	if(del_tip!=del_tail)						// ... ensure same vtx is not referenced for both
 	  {
-	  if(del_tail!=NULL && del_tail!=vecptr->tail){free(del_tail); vertex_mem--;}	// ... delete old tail
-	  if(del_tip!=NULL && del_tip!=vecptr->tip){free(del_tip); vertex_mem--;}	// ... delete old tip
+	  if(del_tail!=NULL && del_tail!=vecptr->tail){vertex_destroy(del_tail);}	// ... delete old tail
+	  if(del_tip!=NULL && del_tip!=vecptr->tip){vertex_destroy(del_tip);}		// ... delete old tip
 	  }
 	else 
 	  {
-	  if(del_tail!=NULL && del_tail!=vecpre->tail){free(del_tail); vertex_mem--;}  	// ... delete old tip/tail since same
+	  if(del_tail!=NULL && del_tail!=vecpre->tail){vertex_destroy(del_tail);}  	// ... delete old tip/tail since same
 	  }
-	if(vecnxt!=NULL){free(vecnxt); vector_mem--;}					// ... delete next vector
-	vecptr=vecpre;							// ... reset position in loop
+	if(vecnxt!=NULL){vector_destroy(vecnxt,FALSE);}					// ... delete next vector
+	vecptr=vecpre;									// ... reset position in loop
 	del_cnt++;
 	vecptr->status=3;
 	if(debug_flag==76)printf("LNXT %6.3f \n",vecptr->curlen);
@@ -308,15 +319,15 @@ vector *vector_colinear_merge(vector *vec_first, int ptyp, float delta)
 	vecpre->angle=vector_absangle(vecpre);				// ... re-calc new vector angle
 	if(del_tip!=del_tail)						// ... ensure same vtx is not referenced for both
 	  {
-	  if(del_tail!=NULL && del_tail!=vecpre->tail){free(del_tail); vertex_mem--;}  	// ... delete old tail
-	  if(del_tip!=NULL && del_tip!=vecnxt->tip){free(del_tip); vertex_mem--;}	// ... delete old tip
+	  if(del_tail!=NULL && del_tail!=vecpre->tail){vertex_destroy(del_tail);}  	// ... delete old tail
+	  if(del_tip!=NULL && del_tip!=vecnxt->tip){vertex_destroy(del_tip);}		// ... delete old tip
 	  }
 	else 
 	  {
-	  if(del_tail!=NULL && del_tail!=vecpre->tail){free(del_tail); vertex_mem--;}  	// ... delete old tip/tail since same
+	  if(del_tail!=NULL && del_tail!=vecpre->tail){vertex_destroy(del_tail);}  	// ... delete old tip/tail since same
 	  }
-	if(vecptr!=NULL){free(vecptr); vector_mem--;}					// ... delete next vector
-	vecptr=vecpre;							// ... reset position in loop
+	if(vecptr!=NULL){vector_destroy(vecptr,FALSE);}					// ... delete next vector
+	vecptr=vecpre;									// ... reset position in loop
 	del_cnt++;
 	vecptr->status=4;
 	if(debug_flag==76)printf("LPRE %6.3f \n",vecptr->curlen);
@@ -343,15 +354,15 @@ vector *vector_colinear_merge(vector *vec_first, int ptyp, float delta)
       vecptr->angle=vector_absangle(vecptr);				// ... re-calc new vector angle
       if(del_tip!=del_tail)						// ... ensure same vtx is not referenced for both
 	{
-	if(del_tail!=NULL && del_tail!=vecptr->tail){free(del_tail); vertex_mem--;}	// ... delete old tail
-	if(del_tip!=NULL && del_tip!=vecptr->tip){free(del_tip); vertex_mem--;}		// ... delete old tip
+	if(del_tail!=NULL && del_tail!=vecptr->tail){vertex_destroy(del_tail);} 	// ... delete old tail
+	if(del_tip!=NULL && del_tip!=vecptr->tip){vertex_destroy(del_tip);}		// ... delete old tip
 	}
       else 
 	{
-	if(del_tail!=NULL && del_tail!=vecpre->tail){free(del_tail); vertex_mem--;}  	// ... delete old tip/tail since same
+	if(del_tail!=NULL && del_tail!=vecpre->tail){vertex_destroy(del_tail);}  	// ... delete old tip/tail since same
 	}
-      if(vecnxt!=NULL){free(vecnxt); vector_mem--;}					// ... delete next vector
-      vecptr=vecpre;							// ... reset position in loop
+      if(vecnxt!=NULL){vector_destroy(vecnxt,FALSE);}					// ... delete next vector
+      vecptr=vecpre;									// ... reset position in loop
       del_cnt++;
       vecptr->status=5;
       if(debug_flag==76)printf("ANXT %6.3f \n",vecptr->curlen);
@@ -370,15 +381,15 @@ vector *vector_colinear_merge(vector *vec_first, int ptyp, float delta)
       vecpre->angle=vector_absangle(vecpre);				// ... re-calc new vector angle
       if(del_tip!=del_tail)						// ... ensure same vtx is not referenced for both
 	{
-	if(del_tail!=NULL && del_tail!=vecpre->tail){free(del_tail); vertex_mem--;}	// ... delete old tail
-	if(del_tip!=NULL && del_tip!=vecnxt->tip){free(del_tip); vertex_mem--;}		// ... delete old tip
+	if(del_tail!=NULL && del_tail!=vecpre->tail){vertex_destroy(del_tail);}		// ... delete old tail
+	if(del_tip!=NULL && del_tip!=vecnxt->tip){vertex_destroy(del_tip);}		// ... delete old tip
 	}
       else 
 	{
-	if(del_tail!=NULL && del_tail!=vecpre->tail){free(del_tail); vertex_mem--;}  	// ... delete old tip/tail since same
+	if(del_tail!=NULL && del_tail!=vecpre->tail){vertex_destroy(del_tail);}  	// ... delete old tip/tail since same
 	}
-      if(vecptr!=NULL){free(vecptr); vector_mem--;}					// ... delete next vector
-      vecptr=vecpre;							// ... reset position in loop
+      if(vecptr!=NULL){vector_destroy(vecptr,FALSE);}					// ... delete next vector
+      vecptr=vecpre;									// ... reset position in loop
       del_cnt++;
       vecptr->status=6;
       if(debug_flag==76)printf("APRE %6.3f \n",vecptr->curlen);
@@ -435,18 +446,7 @@ int vector_purge(vector *vpurge)
     {
     vecdel=vecptr;				// set element to be deleted as current one in loop
     vecptr=vecptr->next;			// get pointer to next element BEFORE deleting it
-    if(vecdel->tip!=NULL)			// if polygons exist, they reference these vertices - don't delete the tips!
-      {
-      free(vecdel->tip);			// free memory space holding first vertex
-      vertex_mem--;				// decrement vertex memory counter
-      }
-    if(vecdel->tail!=NULL)			// polygons do not reference tails... delete away
-      {
-      free(vecdel->tail);			// free memory space holding second vertex
-      vertex_mem--;				// decrement vertex memory counter
-      }
-    free(vecdel);				// free memory space holding pointers and type
-    vector_mem--;				// decrement the number of vectors in memory
+    vector_destroy(vecdel,TRUE);		// free memory space holding pointers and type
     vec_count--;
     if(vec_count<=0)break;
     }
@@ -713,9 +713,7 @@ vector_list *vector_sort(vector *vec_list, float tolerance, int mem_flag)
 	    vec_first->tip->z=vecmin->tip->z;
 	    }
 	  }
-	free(vecmin->tip);  vertex_mem--;
-	free(vecmin->tail); vertex_mem--;
-	free(vecmin); vector_mem--;
+	vector_destroy(vecmin,TRUE);
 	continue;							// keep vecptr where it is, search again
 	}
       
@@ -871,7 +869,7 @@ int vector_crossings(vector *vec_list, int save_in_new)
     if(vecptr==vec_list)break;
     }
   
-  free(vtest);vertex_mem--;
+  vertex_destroy(vtest);
   
   return(1);
 }
@@ -902,7 +900,7 @@ int vector_crosses_polygon(slice *sinpt, vector *vecA, int ptyp)
       if(vnxt==NULL)break;						// ensure not a problem
       vecB=vector_make(vptr,vnxt,0);					// make a test vector bt the two
       vint_result=vector_intersect(vecA,vecB,vnew);			// check if test vector crosses input vector
-      free(vecB); vector_mem--; vecB=NULL;				// release memory
+      vector_destroy(vecB,FALSE); vecB=NULL;				// release memory
       if(vint_result==204 || vint_result==206 || vint_result==220 || vint_result==221 || vint_result==222)
         {
 	state=TRUE;							// ... set to "they DO intersect"
@@ -914,7 +912,7 @@ int vector_crosses_polygon(slice *sinpt, vector *vecA, int ptyp)
     if(state==TRUE)break;						// if one was found, no need to test others
     pptr=pptr->next;							// get next polygon
     }
-  free(vnew); vertex_mem--;						// free temp intersection location vtx
+  vertex_destroy(vnew);							// free temp intersection location vtx
   
   return(state);
 }
@@ -1030,9 +1028,9 @@ int vector_bisector_get_direction(vector *vA, vector *vB, vertex *vnew)
     }
 
   // free the temporary intersection vertex
-  free(vint);vertex_mem--;
-  free(vtxA);vertex_mem--;
-  free(vtxB);vertex_mem--;
+  vertex_destroy(vint);
+  vertex_destroy(vtxA);
+  vertex_destroy(vtxB);
 
   return(vint_result);
 }
@@ -1589,16 +1587,16 @@ int vector_winding_number(vector *vec_list, vector *vec_inpt)
     }
   
   // clean up before leaving
-  free(vtxint); vertex_mem--; vtxint=NULL;
-  free(vtxctr); vertex_mem--; vtxctr=NULL;
-  free(vtx0); vertex_mem--; vtxctr=NULL;
-  free(vtx1); vertex_mem--; vtxctr=NULL;
-  free(vtx2); vertex_mem--; vtxctr=NULL;
-  free(vtx3); vertex_mem--; vtxctr=NULL;
-  free(vec_xmin); vector_mem--; vec_xmin=NULL;
-  free(vec_xmax); vector_mem--; vec_xmax=NULL;
-  free(vec_ymin); vector_mem--; vec_ymin=NULL;
-  free(vec_ymax); vector_mem--; vec_ymax=NULL;
+  vertex_destroy(vtxint); vtxint=NULL;
+  vertex_destroy(vtxctr); vtxctr=NULL;
+  vertex_destroy(vtx0); vtx0=NULL;
+  vertex_destroy(vtx1); vtx1=NULL;
+  vertex_destroy(vtx2); vtx2=NULL;
+  vertex_destroy(vtx3); vtx3=NULL;
+  vector_destroy(vec_xmin,FALSE); vec_xmin=NULL;
+  vector_destroy(vec_xmax,FALSE); vec_xmax=NULL;
+  vector_destroy(vec_ymin,FALSE); vec_ymin=NULL;
+  vector_destroy(vec_ymax,FALSE); vec_ymax=NULL;
   
   return(valid);
 }
@@ -1737,9 +1735,7 @@ int vector_duplicate_delete(vector *veclist, float tolerance)
 	
 	vecdel=vecnxt;
 	vecnxt=vecnxt->next;
-	free(vecdel->tip);  vertex_mem--; vecdel->tip=NULL;
-	free(vecdel->tail); vertex_mem--; vecdel->tail=NULL;
-	free(vecdel); vector_mem--; vecdel=NULL;
+	vector_destroy(vecdel,TRUE); vecdel=NULL;
 	delqty++;
 	
 	if(vecnxt==NULL)break;

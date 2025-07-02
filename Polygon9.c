@@ -139,7 +139,7 @@ int polygon_delete(slice *sptr, polygon *pdel)
     {
     vdel=vptr;								// id the vertex to remove
     vptr=vptr->next;							// move the vptr to the next vertex
-    free(vdel); vertex_mem--; vdel=NULL;				// remove the vertex
+    vertex_destroy(vdel); vdel=NULL;					// remove the vertex
     pdel->vert_qty--;							// decrement the polygon counter as well
     if(pdel->vert_qty<=0)break;						// if it was a loop, we're done
     }
@@ -175,7 +175,7 @@ int polygon_free(polygon *pdel)
     {
     vdel=vptr;								// id the vertex to remove
     vptr=vptr->next;							// move the vptr to the next vertex
-    free(vdel);	vertex_mem--; vdel=NULL;				// remove the vertex
+    vertex_destroy(vdel); vdel=NULL;					// remove the vertex
     pdel->vert_qty--;							// decrement the polygon counter as well
     if(pdel->vert_qty<=0)break;						// if it was a loop, we're done
     }
@@ -555,9 +555,9 @@ float polygon_to_vertex_distance(polygon *ptest, vertex *vtest, vertex *vrtn)
     if(vtxA==ptest->vert_first)break;
     }
 
-  free(AB); vertex_mem--;
-  free(AV); vertex_mem--;
-  free(projection); vertex_mem--;
+  vertex_destroy(AB);
+  vertex_destroy(AV);
+  vertex_destroy(projection);
 
   if(in_out_status==TRUE)min_dist *= (-1);				// if inside make negative
   //printf("   poly2vtx dist:  %6.3f  vtest: x=%6.3f y=%6.3f  pf: x=%6.3f y=%6.3f \n",min_dist,vtest->x,vtest->y,ptest->vert_first->x,ptest->vert_first->y);
@@ -646,7 +646,7 @@ int polygon_find_start(polygon *pinpt, slice *sprev)
       vnxt=vptr->next;
       A=vector_make(vptr,vpre,0); B=vector_make(vptr,vnxt,0);
       cur_angle=fabs(vector_relangle(A,B));
-      free(A); vector_mem--; free(B); vector_mem--;
+      vector_destroy(A,FALSE); vector_destroy(B,FALSE);
       cur_angle=fabs(PI/2-cur_angle);					// calc how close to 90 deg
       if(cur_angle<min_angle){min_angle=cur_angle;vstart=vptr;}		// if closest, save new start
       vptr=vptr->next;
@@ -820,7 +820,7 @@ int polygon_colinear_merge(slice *sptr, polygon *pptr, double delta)
       // at this point, v1 has been found to lie on the line created by v0->v2, so eliminate v1, set v2 to next, and keep v0 same
       v0->next=v1->next;						// ... point v0 past the about to be deleted v1
       if(v1==pptr->vert_first)pptr->vert_first=v0;			// ... make sure v1 wasn't referenced as the start of this poly
-      free(v1);vertex_mem--;						// ... release v1 from memory
+      vertex_destroy(v1);						// ... release v1 from memory
       pptr->vert_qty--;							// ... decrement polygon vtx count
       // note v0 stays as is in this case
       }
@@ -1108,7 +1108,7 @@ int polygon_contains_material2(slice *sptr, polygon *pinpt, int ptyp)
   // check winding number to determine hole status
   pinpt->hole=0;							// default as contains material
   if(vptr->supp%2==0)pinpt->hole=1;					// if even, it's a hole
-  free(vptr); vertex_mem--; vptr=NULL;
+  vertex_destroy(vptr); vptr=NULL;
   
   pinpt->area=polygon_find_area(pinpt);
   if(pinpt->hole>0 && pinpt->area<0)polygon_reverse(pinpt);
@@ -1934,7 +1934,7 @@ int polygon_verify(polygon *pinpt)
 	pinpt->vert_first=vptr;
 	vpre->next=vptr;
 	}
-      free(vdel);vertex_mem--;
+      vertex_destroy(vdel);
       pinpt->vert_qty--;
       }  
     else 
@@ -1996,15 +1996,15 @@ int polygon_selfintersect_check(polygon *pA)
 	vint=vertex_random_insert(vptr,vnew,CLOSE_ENOUGH);		// insert copy of vnew vtx in middle of vec A just after vptr
 	vbrk=vertex_random_insert(nptr,vnew,CLOSE_ENOUGH);		// insert copy of vnew vtx in middle of vec B just after nptr
 	}
-      free(B);vector_mem--;
+      vector_destroy(B,FALSE);
       nptr=nptr->next;		
       if(nptr==pA->vert_first)break;
       }
-    free(A);vector_mem--;
+    vector_destroy(A,FALSE);
     vptr=vptr->next;
     if(vptr==pA->vert_first)break;
     }
-  free(vnew);vertex_mem--;
+  vertex_destroy(vnew);
 
   // at this point we have no crossing vectors... they only cross where intersection vtxs exist
   printf("Polygon Self Intersect:  exit  %d intersections found\n",seq_num);
@@ -2035,17 +2035,17 @@ int polygon_overlap(polygon *pA, polygon *pB)
       if(polygon_contains_point(pA,vptrB)==TRUE){status=TRUE;break;}	// test if inside pA
       vecnewB=vector_make(vptrB,vptrB->next,0);				// define vector of pB
       int_stat=vector_intersect(vecnewA,vecnewB,vtxint);		// test if vectors intersect
-      free(vecnewB); vector_mem--; vecnewB=NULL;			// clean up memory
+      vector_destroy(vecnewB,FALSE); vecnewB=NULL;			// clean up memory
       if(int_stat>=204){status=TRUE; break;}				// check intersection status
       vptrB=vptrB->next;						// move onto next vtx in pB
       if(vptrB==pB->vert_first)break;					// if back at start of pB, done
       }
-    free(vecnewA); vector_mem--; vecnewA=NULL;				// clean up memory
+    vector_destroy(vecnewA,FALSE); vecnewA=NULL;			// clean up memory
     if(status==TRUE)break;
     vptrA=vptrA->next;							// move onto next vtx of pA
     if(vptrA==pA->vert_first)break;					// if back at start of pA, done
     }
-  free(vtxint); vertex_mem--; vtxint=NULL;				// free memory
+  vertex_destroy(vtxint); vtxint=NULL;					// free memory
   
   return(status);
 }
@@ -2460,19 +2460,19 @@ int polygon_intersect(polygon *pA, polygon *pB, double tolerance)
 	  }
 	}
 	
-      free(B);vector_mem--;
+      vector_destroy(B,FALSE);
       Bvtxptr=Bvtxptr->next;	
       if(Bvtxptr==pB->vert_first)break;
       if(Bcount>pB->vert_qty)break;
       }
     
-    free(A);vector_mem--;
+    vector_destroy(A,FALSE);
     Avtxptr=Avtxptr->next;
     if(Avtxptr==pA->vert_first)break;
     if(Acount>pA->vert_qty)break;
     }
     
-  free(vnew);vertex_mem--;
+  vertex_destroy(vnew);
   
   if(debug_flag==198)printf("Polygon Intersect Exit:   vtxs added=%d \n",seq_num);
   //if(seq_num%2!=0)printf("  WARNING:  Odd number of intersections found!\n");
@@ -2611,9 +2611,7 @@ polygon *polygon_boolean2(slice *sinpt, polygon *pA, polygon *pB, int action)
 	
 	vecdel=vecptr;
 	vecptr=vecptr->next;
-	free(vecdel->tip);  vertex_mem--; vecdel->tip=NULL;
-	free(vecdel->tail); vertex_mem--; vecdel->tail=NULL;
-	free(vecdel); vector_mem--; vecdel=NULL;
+	vector_destroy(vecdel,TRUE); vecdel=NULL;
 	total_vector_count--;
 	
 	if(vecptr==NULL)break;
@@ -2627,7 +2625,7 @@ polygon *polygon_boolean2(slice *sinpt, polygon *pA, polygon *pB, int action)
       }
 
     }
-  free(vtest);vertex_mem--;
+  vertex_destroy(vtest);
   
   // apply boolean SUBTRACT logic -  pA=Source, pB=What's removed
   vtest=vertex_make();
@@ -2636,7 +2634,7 @@ polygon *polygon_boolean2(slice *sinpt, polygon *pA, polygon *pB, int action)
     // loop thru all of pA and remove any vectors INSIDE of pB
     // loop thru all of pB and remove any vectors OUTSIDE of pA
     }
-  free(vtest);vertex_mem--;
+  vertex_destroy(vtest);
   
   
   // sort vectors to ensure proper sequencing
@@ -2715,9 +2713,7 @@ polygon *polygon_boolean2(slice *sinpt, polygon *pA, polygon *pB, int action)
 	vecdel=vecptr;
 	vecptr=vecptr->next;
 	if(vecptr==vl_ptr->v_item)break;
-	if(vecdel->tip!=NULL){free(vecdel->tip);vertex_mem--;}
-	if(vecdel->tail!=NULL){free(vecdel->tail);vertex_mem--;}
-	if(vecdel!=NULL){free(vecdel);vector_mem--;}
+	if(vecdel!=NULL){vector_destroy(vecdel,TRUE);}
 	}
       vl_ptr=vl_ptr->next;
       }
@@ -2810,7 +2806,7 @@ int polygon_edge_detection(slice *sptr, int ptyp)
 	  vnxt=vnxt->next;						// move onto next vtx
 	  }
 	vplp->next=pnew->vert_first;					// point the vtx before the last one (vplp) back to the first
-	if(vnxt!=NULL){free(vnxt);vertex_mem--;vnxt=NULL;}		// delete the last one in the list
+	if(vnxt!=NULL){vertex_destroy(vnxt); vnxt=NULL;}		// delete the last one in the list
 	}
       else
         {

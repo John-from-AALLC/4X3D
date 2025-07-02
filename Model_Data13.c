@@ -253,7 +253,7 @@ vertex *vertex_make(void)
   vertex_mem++;								// increment number of vertices in memory
   return(vptr);
   }
-	
+
 // Function to insert new vertex into linked list just AFTER local location, which means the
 // head node will never get replaced (or conversely, you cannot add to the front of the list).
 int vertex_insert(model *mptr, vertex *local, vertex *vertexnew, int typ)
@@ -363,6 +363,15 @@ vertex *vertex_random_insert(vertex *vpre, vertex *vnew, double tolerance)
   return(vptr);
 }
 
+// Function to destroy a vertex (i.e. de-allocate space)
+int vertex_destroy(vertex *vdel)
+{
+  if(vdel==NULL)return(FALSE);
+  free(vdel);
+  vertex_mem--; 
+  return(TRUE);
+}
+	
 // Function to delete a vertex from the list and out of memory
 int vertex_delete(model *mptr, vertex *vdel, int typ)
   {
@@ -374,7 +383,7 @@ int vertex_delete(model *mptr, vertex *vdel, int typ)
   if(vdel==mptr->vertex_first[typ])					// If the very first vtx is the delete target...
     {
     mptr->vertex_first[typ]=vdel->next;					// ... reset the model reference into the list
-    free(vdel);	vertex_mem--; vdel=NULL;				// ... free the memory it was using
+    vertex_destroy(vdel); vdel=NULL;					// ... free the memory it was using
     mptr->vertex_qty[typ]--;						// ... decrement qty of vertices in linked list
     return(1);								// ... and exit with success.
     }
@@ -387,7 +396,7 @@ int vertex_delete(model *mptr, vertex *vdel, int typ)
   if(vptr!=NULL)							// if a reference was found...
     {
     vptr->next=vdel->next;						// ... then skip over it in the list
-    free(vdel);	vertex_mem--; vdel=NULL;				// ... free the memory it was using
+    vertex_destroy(vdel); vdel=NULL;					// ... free the memory it was using
     mptr->vertex_qty[typ]--;						// ... decrement qty of vertices in linked list
     return(1);								// ... and exit with success.
     }
@@ -485,7 +494,7 @@ int vertex_swap(vertex *A, vertex *B)
   B->supp=vtx_temp->supp; B->attr=vtx_temp->attr;
   B->flist=vtx_temp->flist;
   
-  free(vtx_temp); vertex_mem--; vtx_temp=NULL;
+  vertex_destroy(vtx_temp); vtx_temp=NULL;
   
   return(1);
   }
@@ -529,7 +538,7 @@ int vertex_purge(vertex *vlist)
     // delete vtx
     if(vdel!=NULL)
       {
-      free(vdel); vertex_mem--; vdel=NULL; 
+      vertex_destroy(vdel); vdel=NULL; 
       vtx_count--;
       i++;
       }
@@ -712,6 +721,14 @@ vertex_list *vertex_list_make(vertex *vinpt)
   return(vl_ptr);
 }
   
+// Function to destroy a vertex list element (i.e. de-allocate space)
+int vertex_list_destroy(vertex_list *vl_del)
+{
+  if(vl_del==NULL)return(FALSE);
+  free(vl_del);
+  return(TRUE);
+}
+  
 // Function to manage vertex lists - typically used as a "user pick list", but can be used for other things
 // actions:  ADD, DELETE, CLEAR
 vertex_list *vertex_list_manager(vertex_list *vlist, vertex *vinpt, int action)
@@ -774,7 +791,7 @@ vertex_list *vertex_list_manager(vertex_list *vlist, vertex *vinpt, int action)
         {vlist=vl_ptr->next;}
       else 
         {vl_pre->next=vl_ptr->next;}					// otherwise skip over node to be deleted
-      free(vl_del);
+      vertex_list_destroy(vl_del);
       }
     }
     
@@ -785,7 +802,7 @@ vertex_list *vertex_list_manager(vertex_list *vlist, vertex *vinpt, int action)
       {
       vl_del=vl_ptr;
       vl_ptr=vl_ptr->next;
-      free(vl_del);
+      vertex_list_destroy(vl_del);
       }
     if(vlist==vtx_pick_list)vtx_pick_list=NULL;
     vlist=NULL;
@@ -1032,25 +1049,6 @@ edge *edge_make(void)
   edge_mem++;
   return(eptr);
   }
-
-// Function to copy an edge
-// Note - does NOT copy vertices (uses same pointers), also does NOT assign "next"
-edge *edge_copy(edge *einp)
-  {
-  edge		*eptr;
-  
-  if(einp==NULL)return(NULL);
-  eptr=edge_make();
-  eptr->tip=einp->tip;
-  eptr->tail=einp->tail;
-  eptr->Af=einp->Af;
-  eptr->Bf=einp->Bf;
-  eptr->status=einp->status;
-  eptr->display=einp->display;
-  eptr->type=einp->type;  
-    
-  return(eptr);
-  }
   
 // Function to insert new edge into linked list
 int edge_insert(model *mptr, edge *local, edge *edgenew, int typ)
@@ -1080,6 +1078,15 @@ int edge_insert(model *mptr, edge *local, edge *edgenew, int typ)
   return(1);			
   }
 
+// Function to destroy an edge (i.e. de-allocate space)
+int edge_destroy(edge *edel)
+{
+  if(edel==NULL)return(FALSE);
+  free(edel);
+  edge_mem--; 
+  return(TRUE);
+}
+	
 // Function to delete a edge from the list and out of memory
 int edge_delete(model *mptr, edge *edel, int typ)
   {
@@ -1091,9 +1098,8 @@ int edge_delete(model *mptr, edge *edel, int typ)
   if(edel==mptr->edge_first[typ])					// If the very first edge is the delete target...
     {
     mptr->edge_first[typ]=edel->next;					// ... reset the model reference into the list
-    free(edel);								// ... free the memory it was using
+    edge_destroy(edel);							// ... free the memory it was using
     mptr->edge_qty[typ]--;						// ... decrement qty of edges in linked list
-    edge_mem--;								// ... decrement qty of edges in memory
     return(1);								// ... and exit with success.
     }
   eptr=mptr->edge_first[typ];
@@ -1106,12 +1112,30 @@ int edge_delete(model *mptr, edge *edel, int typ)
     {
     if(edel==mptr->edge_last[typ])mptr->edge_last[typ]=eptr;	// ... reset end of list ptr
     eptr->next=edel->next;						// ... then skip over it in the list
-    free(edel);								// ... free the memory it was using
+    edge_destroy(edel);							// ... free the memory it was using
     mptr->edge_qty[typ]--;						// ... decrement qty of edges in linked list
-    edge_mem--;								// ... decrement qty of edges in memory
     return(1);								// ... and exit with success.
     }
   return(0);								// otherwise exist with failure
+  }
+
+// Function to copy an edge
+// Note - does NOT copy vertices (uses same pointers), also does NOT assign "next"
+edge *edge_copy(edge *einp)
+  {
+  edge		*eptr;
+  
+  if(einp==NULL)return(NULL);
+  eptr=edge_make();
+  eptr->tip=einp->tip;
+  eptr->tail=einp->tail;
+  eptr->Af=einp->Af;
+  eptr->Bf=einp->Bf;
+  eptr->status=einp->status;
+  eptr->display=einp->display;
+  eptr->type=einp->type;  
+    
+  return(eptr);
   }
 
 // Function to compare two edges by vertex coordinates.  returns true if same
@@ -1222,7 +1246,7 @@ int edge_display(model *mptr, float angle, int typ)
       if(vector_magnitude(vecptr)<min_edge_len)eptr->display=FALSE;
       eptr=eptr->next;
       }
-    free(vecptr);vector_mem--;vecptr=NULL;
+    vector_destroy(vecptr,FALSE); vecptr=NULL;
     }
     
   printf("Edge display: %ld edges made\n",mptr->edge_qty[typ]);
@@ -1299,8 +1323,8 @@ int edge_silhouette(model *mptr, float spin, float tilt)
     
     Adot=vector_dotproduct(ViewVec,Avec);				// + if pointing away, - if pointing toward
     
-    free(ViewVec); vector_mem--;
-    free(Avec); vector_mem--;
+    vector_destroy(ViewVec,FALSE);
+    vector_destroy(Avec,FALSE);
     
     if(Adot<0)								// if this facet is facing forward...
       {
@@ -1324,8 +1348,8 @@ int edge_silhouette(model *mptr, float spin, float tilt)
 	
 	Ndot=vector_dotproduct(ViewVec,Avec);				// + if pointing away, - if pointing toward
 	
-	free(ViewVec); vector_mem--;
-	free(Avec); vector_mem--;
+	vector_destroy(ViewVec,FALSE);
+	vector_destroy(Avec,FALSE);
 
 	if(Ndot>0)							// if signs flip... add edge
 	  {
@@ -1363,15 +1387,15 @@ int edge_silhouette(model *mptr, float spin, float tilt)
       i++;
       eptr=eptr->next;
       }
-    free(vecptr);vector_mem--;vecptr=NULL;
+    vector_destroy(vecptr,FALSE); vecptr=NULL;
     }
   */
 
   // clean up
-  free(Avtx); vertex_mem--;
-  free(Vvtx); vertex_mem--;
-  free(vctr); vertex_mem--;
-  free(vwpt); vertex_mem--;
+  vertex_destroy(Avtx);
+  vertex_destroy(Vvtx);
+  vertex_destroy(vctr);
+  vertex_destroy(vwpt);
   
   mptr->MRedraw_flag=FALSE;
   
@@ -1437,6 +1461,14 @@ edge_list *edge_list_make(edge *einpt)
   return(el_ptr);
 }
   
+// Function to destroy an edge list element (i.e. de-allocate space)
+int edge_list_destroy(edge_list *el_del)
+{
+  if(el_del==NULL)return(FALSE);
+  free(el_del);
+  return(TRUE);
+}
+  
 // Function to manage edge lists - typically used as a "user pick list", but can be used for other things
 // actions:  ADD, DELETE, CLEAR
 edge_list *edge_list_manager(edge_list *elist, edge *einpt, int action)
@@ -1500,7 +1532,7 @@ edge_list *edge_list_manager(edge_list *elist, edge *einpt, int action)
         {elist=el_ptr->next;}
       else 
         {el_pre->next=el_ptr->next;}					// otherwise skip over node to be deleted
-      free(el_del);
+      edge_list_destroy(el_del);
       }
     }
     
@@ -1511,7 +1543,7 @@ edge_list *edge_list_manager(edge_list *elist, edge *einpt, int action)
       {
       el_del=el_ptr;
       el_ptr=el_ptr->next;
-      free(el_del);
+      edge_list_destroy(el_del);
       }
     if(elist==e_pick_list)e_pick_list=NULL;
     elist=NULL;
@@ -1641,7 +1673,7 @@ facet *facet_make(void)
     facet_mem++;
     return(fptr);
 }
-
+	
 // Function to insert new facet, or list of facets, into linked list
 // Inputs:  mptr=model, local=ptr to location in existing facet list, facetnew=new facet(s) to insert, typ=model type
 // Return:  0=failed, 1=success
@@ -1684,6 +1716,16 @@ int facet_insert(model *mptr, facet *local, facet *facetnew, int typ)
   return(TRUE);		
 }
 
+// Function to destroy a facet (i.e. de-allocate space)
+int facet_destroy(facet *fdel)
+{
+  if(fdel==NULL)return(FALSE);
+  vertex_destroy(fdel->unit_norm);					// ... free the memory containing the unit normal
+  free(fdel);
+  facet_mem--; 
+  return(TRUE);
+}
+
 // Function to delete a facet from the list and out of memory
 int facet_delete(model *mptr, facet *fdel, int typ)
 {
@@ -1701,8 +1743,7 @@ int facet_delete(model *mptr, facet *fdel, int typ)
   if(fptr!=NULL)							// if a reference was found...
     {
     fptr->next=fdel->next;						// ... then skip over it in the list
-    free(fdel->unit_norm); vertex_mem--; fdel->unit_norm=NULL;		// ... free the memory containing the unit normal
-    free(fdel); facet_mem--; fdel=NULL;					// ... free the memory it was using to hold pointers
+    facet_destroy(fdel); fdel=NULL;					// ... free the memory it was using to hold pointers
     mptr->facet_qty[typ]--;						// ... decrement qty of facets in linked list
     return(1);								// ... and exit with success.
     }
@@ -1752,8 +1793,7 @@ int facet_purge(facet *flist)
     {
     fdel=fptr;
     fptr=fptr->next;
-    if(fdel->unit_norm!=NULL){free(fdel->unit_norm); vertex_mem--; fdel->unit_norm=NULL;}
-    if(fdel!=NULL){free(fdel); facet_mem--; fdel=NULL;}
+    if(fdel!=NULL){facet_destroy(fdel); fdel=NULL;}
     }
     
   //printf("Facet Purge Exit:   facet=%ld \n",facet_mem);
@@ -1785,10 +1825,10 @@ int facet_normal(facet *finp)
   finp->unit_norm->y=vnorm->y/vmag;
   finp->unit_norm->z=vnorm->z/vmag;
   
-  free(vN);vector_mem--;vN=NULL;
-  free(vnorm);vertex_mem--;vnorm=NULL;
-  free(vB);vector_mem--;vB=NULL;
-  free(vA);vector_mem--;vA=NULL;
+  vector_destroy(vN,FALSE);
+  vertex_destroy(vnorm);
+  vector_destroy(vB,FALSE);
+  vector_destroy(vA,FALSE);
   
   return(1);  
   }
@@ -1822,10 +1862,10 @@ float facet_area(facet *fptr)
   vC=vector_make(fptr->vtx[0],vcrs,0);
   area=vector_magnitude(vC)/2.0;
   
-  free(vC); vector_mem--; vC=NULL;
-  free(vB); vector_mem--; vB=NULL;
-  free(vA); vector_mem--; vA=NULL;
-  free(vcrs); vertex_mem--; vcrs=NULL;
+  vector_destroy(vC,FALSE); vC=NULL;
+  vector_destroy(vB,FALSE); vB=NULL;
+  vector_destroy(vA,FALSE); vA=NULL;
+  vertex_destroy(vcrs); vcrs=NULL;
   
   fptr->area=area;
   
@@ -2072,12 +2112,12 @@ int facet_unit_normal(facet *fptr)
   fptr->unit_norm->z=vtxN->z/N->curlen;
   
   // free memory
-  free(N); vector_mem--; N=NULL;
-  free(vtx_org); vertex_mem--; vtx_org=NULL;
-  free(vtxN); vertex_mem--; vtxN=NULL;
-  free(vtxC); vertex_mem--; vtxC=NULL;
-  free(vtxB); vertex_mem--; vtxB=NULL;
-  free(vtxA); vertex_mem--; vtxA=NULL;
+  vector_destroy(N,FALSE); N=NULL;
+  vertex_destroy(vtx_org); vtx_org=NULL;
+  vertex_destroy(vtxN); vtxN=NULL;
+  vertex_destroy(vtxC); vtxC=NULL;
+  vertex_destroy(vtxB); vtxB=NULL;
+  vertex_destroy(vtxA); vtxA=NULL;
   
   // compare against neighbors to see if going same general direction
   if(fptr->fct[0]!=NULL && fptr->fct[1]!=NULL && fptr->fct[2]!=NULL)
@@ -2208,8 +2248,8 @@ vector *facet_share_edge(facet *fA, facet *fB)
     if(vector_compare(vA,vB,tol)==TRUE)share20=TRUE;
     }
   
-  free(vA); vector_mem--;
-  free(vB); vector_mem--;
+  vector_destroy(vA,FALSE);
+  vector_destroy(vB,FALSE);
 
   vresult=NULL;
   if(share01==TRUE)vresult=vector_make(fA->vtx[0],fA->vtx[1],0);
@@ -2412,7 +2452,7 @@ facet *facet_subdivide(model *mptr, facet *finp, float edgelen)
       {
       vdel=v01;
       v01=vadd;
-      free(vdel); vertex_mem--;
+      vertex_destroy(vdel);
       }
     
     v12=vertex_make();
@@ -2426,7 +2466,7 @@ facet *facet_subdivide(model *mptr, facet *finp, float edgelen)
       {
       vdel=v12;
       v12=vadd;
-      free(vdel); vertex_mem--;
+      vertex_destroy(vdel);
       }
     
     v20=vertex_make();
@@ -2440,7 +2480,7 @@ facet *facet_subdivide(model *mptr, facet *finp, float edgelen)
       {
       vdel=v20;
       v20=vadd;
-      free(vdel); vertex_mem--;
+      vertex_destroy(vdel);
       }
   
     // make three new facets that cover each of the corners of the original facet.
@@ -2788,6 +2828,7 @@ int model_delete(model *mdl_del)
   genericlist	*aptr,*dptr;
 
   if(mdl_del==NULL)return(0);
+  if(job.state==JOB_RUNNING)return(0);
   //printf("\nModel Delete Entry:  vtx=%ld  vec=%ld \n",vertex_mem,vector_mem);
 
   // test if first model in list
@@ -2808,7 +2849,7 @@ int model_delete(model *mdl_del)
     }
   //active_model=job.model_first;
     
-  // resequence the model IDs still in the job
+  // resequence the model IDs still in the job which should also reduce the total job count by one
   job.model_count=0;
   mptr=job.model_first;
   while(mptr!=NULL)
@@ -2864,14 +2905,9 @@ int model_delete(model *mdl_del)
     autoplacement_flag=TRUE;
     set_center_build_job=TRUE;
     set_auto_zoom=TRUE;
-    MVview_scale=1.2; 
-    MVgxoffset=425; 
-    MVgyoffset=375; 
-    MVdisp_spin=(-37*PI/180); 
-    MVdisp_tilt=(210*PI/180);
-    LVview_scale=1.00;
-    LVgxoffset=155;
-    LVgyoffset=(-490);
+    active_model=NULL;
+    {MVview_scale=1.2; MVgxoffset=425; MVgyoffset=375; MVdisp_spin=(-37*PI/180); MVdisp_tilt=(210*PI/180);}
+    {LVview_scale=1.00; LVgxoffset=155; LVgyoffset=(-490);}
     }
   
   //printf("\nModel Delete Exit:  count=%d  vtx=%ld  vec=%ld \n",job.model_count,vertex_mem,vector_mem);
@@ -4100,12 +4136,12 @@ slice *model_raw_slice(model *mptr, int slot, int mtyp, int ptyp, float z_level)
 	      vecptr=vector_make(vptr2,vptr3,0);			// make a new vector list element of model material type
 	      vecptr->member=fptr->member;				// keep track of which body this vector originated from
 	      vector_raw_insert(sptr,ptyp,vecptr);			// insert it into the linked list of vectors
-	      if(vptr1!=NULL){free(vptr1); vertex_mem--;vptr1=NULL;}	// decrement vertex in memory counter
+	      if(vptr1!=NULL){vertex_destroy(vptr1); vptr1=NULL;}	// decrement vertex in memory counter
 	      }
 	    else 							// otherwise, do not create the vector
 	      {
-	      if(vptr2!=NULL){free(vptr2); vertex_mem--;vptr2=NULL;}
-	      if(vptr3!=NULL){free(vptr3); vertex_mem--;vptr3=NULL;}
+	      if(vptr2!=NULL){vertex_destroy(vptr2); vptr2=NULL;}
+	      if(vptr3!=NULL){vertex_destroy(vptr3); vptr3=NULL;}
 	      }
 	    }
 	  if(z_flag1==1 && z_flag3==1)					// ... then vptr1 and vptr3 must be edges that cross
@@ -4115,12 +4151,12 @@ slice *model_raw_slice(model *mptr, int slot, int mtyp, int ptyp, float z_level)
 	      vecptr=vector_make(vptr1,vptr3,0);			// make a new vector list element of type build
 	      vecptr->member=fptr->member;				// keep track of which body this vector originated from
 	      vector_raw_insert(sptr,ptyp,vecptr);			// insert it into the linked list of vectors
-	      if(vptr2!=NULL){free(vptr2); vertex_mem--;vptr2=NULL;}	// decrement vertex in memory counter
+	      if(vptr2!=NULL){vertex_destroy(vptr2); vptr2=NULL;}	// decrement vertex in memory counter
 	      }
 	    else 							// otherwise, do not create the vector
 	      {
-	      if(vptr1!=NULL){free(vptr1); vertex_mem--;vptr1=NULL;}
-	      if(vptr3!=NULL){free(vptr3); vertex_mem--;vptr3=NULL;}
+	      if(vptr1!=NULL){vertex_destroy(vptr1); vptr1=NULL;}
+	      if(vptr3!=NULL){vertex_destroy(vptr3); vptr3=NULL;}
 	      }
 	    }
 	  if(z_flag1==1 && z_flag2==1)					// ... then vptr1 and vptr2 must be edges that cross
@@ -4130,12 +4166,12 @@ slice *model_raw_slice(model *mptr, int slot, int mtyp, int ptyp, float z_level)
 	      vecptr=vector_make(vptr1,vptr2,0);			// make a new vector list element of type build
 	      vecptr->member=fptr->member;				// keep track of which body this vector originated from
 	      vector_raw_insert(sptr,ptyp,vecptr);			// insert it into the linked list of vectors
-	      if(vptr3!=NULL){free(vptr3); vertex_mem--;vptr3=NULL;}	// decrement vertex in memory counter
+	      if(vptr3!=NULL){vertex_destroy(vptr3); vptr3=NULL;}	// decrement vertex in memory counter
 	      }
 	    else 							// otherwise, do not create the vector
 	      {
-	      if(vptr1!=NULL){free(vptr1); vertex_mem--;vptr1=NULL;}
-	      if(vptr2!=NULL){free(vptr2); vertex_mem--;vptr2=NULL;}
+	      if(vptr1!=NULL){vertex_destroy(vptr1); vptr1=NULL;}
+	      if(vptr2!=NULL){vertex_destroy(vptr2); vptr2=NULL;}
 	      }
 	    }
 
@@ -4182,6 +4218,7 @@ slice *model_raw_slice(model *mptr, int slot, int mtyp, int ptyp, float z_level)
 	  // loop thru the list of prepolygons (i.e. vec_list) and merge together vectors that fall within
 	  // angular tolerance or are shorter than the minimum vector length.
 	  //printf("    enter vector merge.\n");
+	  min_vector_length=0.100;					// force to shortest logic distance for MDL_PERIM
 	  vl_ptr=sptr->vec_list[ptyp];
 	  while(vl_ptr!=NULL)
 	    {
@@ -5298,7 +5335,7 @@ int model_grayscale_cut(model *mptr)
 	  if(merge_vtx==TRUE)
 	    {
 	    vptr->next=vnxt->next;
-	    free(vnxt); vertex_mem--;
+	    vertex_destroy(vnxt);
 	    merge_vtx=FALSE;
 	    }
 	  else 
@@ -5368,7 +5405,7 @@ int model_grayscale_cut(model *mptr)
 	    if(merge_vtx==TRUE)
 	      {
 	      vptr->next=vnxt->next;
-	      free(vnxt); vertex_mem--;
+	      vertex_destroy(vnxt);
 	      merge_vtx=FALSE;
 	      }
 	    else 
@@ -5865,7 +5902,7 @@ int model_build_internal_support(model *mptr)
 	    {
 	    vecnew=vector_make(vptr,vptr->next,0);
 	    for(i=0;i<3;i++){vtx_in[i]=vector_intersect(vecnew,vec[i],vtxint);}
-	    free(vecnew); vector_mem--; vecnew=NULL;
+	    vector_destroy(vecnew,FALSE); vecnew=NULL;
 	    if(vtx_in[0]>=204 || vtx_in[1]>=204 || vtx_in[2]>=204)
 	      {
 	      vtst=TRUE; 
@@ -5876,7 +5913,7 @@ int model_build_internal_support(model *mptr)
 	    }
 	  
 	  // clean up memory
-	  for(i=0;i<3;i++){free(vec[i]); vector_mem--; vec[i]=NULL;}
+	  for(i=0;i<3;i++){vector_destroy(vec[i],FALSE); vec[i]=NULL;}
 	  }
 	
 	// if any of this model facet falls within the patch bounds... 
@@ -5912,8 +5949,8 @@ int model_build_internal_support(model *mptr)
       }
       
     // clean up
-    free(vtxD); vertex_mem--; vtxD=NULL;
-    free(vtxint); vertex_mem--; vtxint=NULL;
+    vertex_destroy(vtxD); vtxD=NULL;
+    vertex_destroy(vtxint); vtxint=NULL;
 
     printf("  lower model patches identified.\n");
   }
@@ -6036,7 +6073,7 @@ int model_build_internal_support(model *mptr)
 		{
 		patch_find_z(patptr,vtxnew[i]);
 		vtx_ptr=vertex_unique_insert(mptr,mptr->vertex_last[INTERNAL],vtxnew[i],INTERNAL,CLOSE_ENOUGH);
-		if(vtx_ptr!=vtxnew[i]){free(vtxnew[i]); vertex_mem--; vtxnew[i]=vtx_ptr;}
+		if(vtx_ptr!=vtxnew[i]){vertex_destroy(vtxnew[i]); vtxnew[i]=vtx_ptr;}
 		}
 	      }
 	      
@@ -6194,7 +6231,7 @@ int model_build_internal_support(model *mptr)
 	      if(vtx_in[i]==TRUE)
 		{
 		vtx_ptr=vertex_unique_insert(mptr,mptr->vertex_last[INTERNAL],vtxlow[i],INTERNAL,CLOSE_ENOUGH);
-		if(vtx_ptr!=vtxlow[i]){free(vtxlow[i]); vertex_mem--; vtxlow[i]=vtx_ptr;}
+		if(vtx_ptr!=vtxlow[i]){vertex_destroy(vtxlow[i]); vtxlow[i]=vtx_ptr;}
 		}
 	      }
   
@@ -6246,8 +6283,8 @@ int model_build_internal_support(model *mptr)
 	      {
 	      if(vtx_in[i]==FALSE)
 		{
-		free(vtxnew[i]); vertex_mem--; vtxnew[i]=NULL;
-		free(vtxlow[i]); vertex_mem--; vtxlow[i]=NULL;
+		vertex_destroy(vtxnew[i]); vtxnew[i]=NULL;
+		vertex_destroy(vtxlow[i]); vtxlow[i]=NULL;
 		}
 	      }
 	      
@@ -6255,7 +6292,7 @@ int model_build_internal_support(model *mptr)
 	  else 
 	    {
 	    // delete all test vtxs since all not in patch
-	    for(i=0;i<4;i++){free(vtxnew[i]); vertex_mem--; vtxnew[i]=NULL;}
+	    for(i=0;i<4;i++){vertex_destroy(vtxnew[i]); vtxnew[i]=NULL;}
 	    }
 	    
 	  }	// end of iy increment loop
@@ -6268,7 +6305,7 @@ int model_build_internal_support(model *mptr)
     facet_find_all_neighbors(mptr->facet_first[INTERNAL]);
     
     // clean up
-    free(vtxint); vertex_mem--; vtxint=NULL;
+    vertex_destroy(vtxint); vtxint=NULL;
     
     printf("  upper and lower support facets generated.\n");
 
@@ -6397,7 +6434,7 @@ int model_build_internal_support(model *mptr)
     facet_find_all_neighbors(mptr->facet_first[INTERNAL]);
     
     // clean up
-    free(vtxD); vertex_mem--; vtxD=NULL;
+    vertex_destroy(vtxD); vtxD=NULL;
     
     printf("  wall support facets made.\n");
   }
@@ -6493,14 +6530,14 @@ int vector_facet_intersect(facet *fptr, vector *vecptr, vertex *vint)
     if(fabs(a)<TOLERANCE)	  					// Segment is parallel to triangle
       {
       // clean up
-      free(segdir); vertex_mem--;
-      free(ed1); vertex_mem--;
-      free(ed2); vertex_mem--;
-      free(vtx_origin); vertex_mem--;
-      free(vtx_cp); vertex_mem--;
-      free(vec_dir); vector_mem--;
-      free(vec_edge1); vector_mem--;
-      free(vec_edge2); vector_mem--;
+      vertex_destroy(segdir);
+      vertex_destroy(ed1);
+      vertex_destroy(ed2);
+      vertex_destroy(vtx_origin);
+      vertex_destroy(vtx_cp);
+      vector_destroy(vec_dir,FALSE);
+      vector_destroy(vec_edge1,FALSE);
+      vector_destroy(vec_edge2,FALSE);
       return(FALSE);
       }
     
@@ -6519,16 +6556,16 @@ int vector_facet_intersect(facet *fptr, vector *vecptr, vertex *vint)
     if(u<0.0 || u>1.0)							// not on segment
       {
       // clean up
-      free(sval); vertex_mem--;
-      free(segdir); vertex_mem--;
-      free(ed1); vertex_mem--;
-      free(ed2); vertex_mem--;
-      free(vtx_origin); vertex_mem--;
-      free(vtx_cp); vertex_mem--;
-      free(svec); vector_mem--;
-      free(vec_dir); vector_mem--;
-      free(vec_edge1); vector_mem--;
-      free(vec_edge2); vector_mem--;
+      vertex_destroy(sval);
+      vertex_destroy(segdir);
+      vertex_destroy(ed1);
+      vertex_destroy(ed2);
+      vertex_destroy(vtx_origin);
+      vertex_destroy(vtx_cp);
+      vector_destroy(svec,FALSE);
+      vector_destroy(vec_dir,FALSE);
+      vector_destroy(vec_edge1,FALSE);
+      vector_destroy(vec_edge2,FALSE);
       return(FALSE);
       }
   
@@ -6543,18 +6580,18 @@ int vector_facet_intersect(facet *fptr, vector *vecptr, vertex *vint)
     if(v<0.0 || (u+v)>1.0)						// outside max/min box of facet
       {
       // clean up
-      free(qval); vertex_mem--;
-      free(sval); vertex_mem--;
-      free(segdir); vertex_mem--;
-      free(ed1); vertex_mem--;
-      free(ed2); vertex_mem--;
-      free(vtx_origin); vertex_mem--;
-      free(vtx_cp); vertex_mem--;
-      free(qvec); vector_mem--;
-      free(svec); vector_mem--;
-      free(vec_dir); vector_mem--;
-      free(vec_edge1); vector_mem--;
-      free(vec_edge2); vector_mem--;
+      vertex_destroy(qval);
+      vertex_destroy(sval);
+      vertex_destroy(segdir);
+      vertex_destroy(ed1);
+      vertex_destroy(ed2);
+      vertex_destroy(vtx_origin);
+      vertex_destroy(vtx_cp);
+      vector_destroy(qvec,FALSE);
+      vector_destroy(svec,FALSE);
+      vector_destroy(vec_dir,FALSE);
+      vector_destroy(vec_edge1,FALSE);
+      vector_destroy(vec_edge2,FALSE);
       return(FALSE);
       }
   
@@ -6564,35 +6601,35 @@ int vector_facet_intersect(facet *fptr, vector *vecptr, vertex *vint)
     if(t<0.0 || t>1.0)							// not within triangle side of facet
       {
       // clean up
-      free(qval); vertex_mem--;
-      free(sval); vertex_mem--;
-      free(segdir); vertex_mem--;
-      free(ed1); vertex_mem--;
-      free(ed2); vertex_mem--;
-      free(vtx_origin); vertex_mem--;
-      free(vtx_cp); vertex_mem--;
-      free(qvec); vector_mem--;
-      free(svec); vector_mem--;
-      free(vec_dir); vector_mem--;
-      free(vec_edge1); vector_mem--;
-      free(vec_edge2); vector_mem--;
+      vertex_destroy(qval);
+      vertex_destroy(sval);
+      vertex_destroy(segdir);
+      vertex_destroy(ed1);
+      vertex_destroy(ed2);
+      vertex_destroy(vtx_origin);
+      vertex_destroy(vtx_cp);
+      vector_destroy(qvec,FALSE);
+      vector_destroy(svec,FALSE);
+      vector_destroy(vec_dir,FALSE);
+      vector_destroy(vec_edge1,FALSE);
+      vector_destroy(vec_edge2,FALSE);
       return(FALSE);
       }
 
     
     // clean up
-    free(qval); vertex_mem--;
-    free(sval); vertex_mem--;
-    free(segdir); vertex_mem--;
-    free(ed1); vertex_mem--;
-    free(ed2); vertex_mem--;
-    free(vtx_origin); vertex_mem--;
-    free(vtx_cp); vertex_mem--;
-    free(qvec); vector_mem--;
-    free(svec); vector_mem--;
-    free(vec_dir); vector_mem--;
-    free(vec_edge1); vector_mem--;
-    free(vec_edge2); vector_mem--;
+    vertex_destroy(qval);
+    vertex_destroy(sval);
+    vertex_destroy(segdir);
+    vertex_destroy(ed1);
+    vertex_destroy(ed2);
+    vertex_destroy(vtx_origin);
+    vertex_destroy(vtx_cp);
+    vector_destroy(qvec,FALSE);
+    vector_destroy(svec,FALSE);
+    vector_destroy(vec_dir,FALSE);
+    vector_destroy(vec_edge1,FALSE);
+    vector_destroy(vec_edge2,FALSE);
 
    /*    
    // calculate the parameters for the plane
@@ -6627,15 +6664,15 @@ int vector_facet_intersect(facet *fptr, vector *vecptr, vertex *vint)
    vtx1=vertex_make();
    vec1=vector_make(fptr->vtx[0],vint,0);
    vector_unit_normal(vec1,vtx1);
-   free(vec1); vector_mem--; vec1=NULL;
+   vector_destroy(vec1,FALSE); vec1=NULL;
    vtx2=vertex_make();
    vec2=vector_make(fptr->vtx[1],vint,0);
    vector_unit_normal(vec2,vtx2);
-   free(vec2); vector_mem--; vec2=NULL;
+   vector_destroy(vec2,FALSE); vec2=NULL;
    vtx3=vertex_make();
    vec3=vector_make(fptr->vtx[2],vint,0);
    vector_unit_normal(vec3,vtx3);
-   free(vec3); vector_mem--; vec3=NULL;
+   vector_destroy(vec3,FALSE); vec3=NULL;
 
    a1=vertex_dotproduct(vtx1,vtx2);
    a2=vertex_dotproduct(vtx2,vtx3);
@@ -6643,9 +6680,9 @@ int vector_facet_intersect(facet *fptr, vector *vecptr, vertex *vint)
    total = (acos(a1) + acos(a2) + acos(a3));
    
    // release memory
-   free(vtx1); vertex_mem--; vtx1=NULL;
-   free(vtx2); vertex_mem--; vtx2=NULL;
-   free(vtx3); vertex_mem--; vtx3=NULL;
+   vertex_destroy(vtx1); vtx1=NULL;
+   vertex_destroy(vtx2); vtx2=NULL;
+   vertex_destroy(vtx3); vtx3=NULL;
    
    // test if all angles don't add up to 2PI
    if (fabs(total) < (2*PI-5*CLOSE_ENOUGH))
@@ -6808,7 +6845,7 @@ patch *patch_copy(model *mptr, patch *pat_src, int target_mdl_typ)
 	}
       if(vptr!=NULL)							// if a match was found ...
 	{
-	free(fnew->vtx[i]); vertex_mem--; 				// ... free the one previously created for this facet
+	vertex_destroy(fnew->vtx[i]);	 				// ... free the one previously created for this facet
 	fnew->vtx[i]=vptr;						// ... define the existing one as this facet's vtx
 	}
       else 								// otherwise add the new vtx to the support vertex list
@@ -6873,7 +6910,7 @@ int patch_find_z(patch *patptr, vertex *vinpt)
     }
   vinpt->z=maxz;
   
-  free(vint); vertex_mem--;
+  vertex_destroy(vint);
   
   if(fl_ptr==NULL)return(FALSE);
   return(TRUE);
@@ -7164,12 +7201,8 @@ int patch_find_free_edge(patch *pat_inpt)
 	vec_next=match_vec[i]->next;
 	if(vec_prev!=NULL)vec_prev->next=vec_next;			// add link around node about to be deleted
 	if(vec_next!=NULL)vec_next->prev=vec_prev;			// add link around node about to be deleted in other direction
-	free(match_vec[i]->tip); vertex_mem--;
-	free(match_vec[i]->tail); vertex_mem--;
-	free(match_vec[i]); vector_mem--; match_vec[i]=NULL;		// delete the matching vector from the list
-	free(new_vec[i]->tip); vertex_mem--;
-	free(new_vec[i]->tail); vertex_mem--;
-	free(new_vec[i]); vector_mem--; new_vec[i]=NULL;		// delete the new vec that matched it
+	vector_destroy(match_vec[i],TRUE); match_vec[i]=NULL;		// delete the matching vector from the list
+	vector_destroy(new_vec[i],TRUE); new_vec[i]=NULL;		// delete the new vec that matched it
 	h--;								// decrement vector counter
 	}
       }
@@ -7249,9 +7282,7 @@ int patch_find_free_edge(patch *pat_inpt)
   while(vlptr!=NULL)
     {
     vecptr=vlptr->v_item;
-    free(vecptr->tip); vertex_mem--;
-    free(vecptr->tail); vertex_mem--;
-    free(vecptr); vector_mem--;
+    vector_destroy(vecptr,TRUE);
     vlptr=vlptr->next;
     }
   vlist=vector_list_manager(vlist,NULL,ACTION_CLEAR);
@@ -7295,8 +7326,7 @@ int branch_delete(branch *brdel)
     {
     vdel=vptr;
     vptr=vptr->next;
-    free(vdel); 
-    vertex_mem--;
+    vertex_destroy(vdel); 
     }
   
   // free linked list of goals
@@ -7305,8 +7335,7 @@ int branch_delete(branch *brdel)
     {
     vdel=vptr;
     vptr=vptr->next;
-    free(vdel); 
-    vertex_mem--;
+    vertex_destroy(vdel); 
     }
 
   // free linked list of polygons

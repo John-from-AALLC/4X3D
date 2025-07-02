@@ -821,7 +821,7 @@ float slice_point_near_material(slice *sinpt, vertex *vinpt, int ptyp)
       }
     pptr=pptr->next;
     }
-  free(vtx_dist); vertex_mem--;   
+  vertex_destroy(vtx_dist);
   
   if(inside_matl==TRUE)min_dist *= (-1);
   //printf("\n  Slice_point_near_material:  exit  dist=%6.3f \n",min_dist);
@@ -1088,15 +1088,13 @@ int slice_linefill(slice *blw_sptr,slice *crt_sptr,slice *abv_sptr,float scanste
 		}
 	      }
 	    vint=vint->next;
-	    free(B);
-	    vector_mem--;
+	    vector_destroy(B,FALSE);
 	    }while(vint!=pptr->vert_first);
 	  pptr=pptr->next;						// move onto the next polygon in this slice
 	  }
 	slpr=slpr->next;						// move onto the next slice above the current
 	}
-      free(A);
-      vector_mem--;
+      vector_destroy(A,FALSE);
 
       // at this point we have a list of verticies for this one scanline that represent all the intersections found between
       // all the inner most polygons of all slices and the scanline.  this list is held in int_string, but is in random order.
@@ -1130,15 +1128,12 @@ int slice_linefill(slice *blw_sptr,slice *crt_sptr,slice *abv_sptr,float scanste
       vptr=vptr->next;							// move onto next line segment of hc fill line string (could be multi segmented)
       }while(vptr->next!=NULL);						// end when we've done all of the hc fill string segments
       
-    free(vnew);								// delete temporary vertex from memory
-    vertex_mem--;							// adjust vertex memory count as such
+    vertex_destroy(vnew);						// delete temporary vertex from memory
 
     // since we are done with hc_string (the scanline) it can be removed
     vint=hc_string->next;
-    free(hc_string);
-    vertex_mem--;
-    free(vint);
-    vertex_mem--;
+    vertex_destroy(hc_string);
+    vertex_destroy(vint);
  
     // at this point the int_string is now broken into segments that are either completely inside polygons or completely outside.
     // now we can count the winding number from left to right and keep what is inside and throw away whats outside.
@@ -1228,8 +1223,7 @@ int slice_linefill(slice *blw_sptr,slice *crt_sptr,slice *abv_sptr,float scanste
       if(vptr==int_string)						
         {
 	int_string=vptr->next;						// ... set the start of the string to the next vtx
-	free(vptr);							// ... get rid of this vtx
-	vertex_mem--;							// ... decrement memory tracker
+	vertex_destroy(vptr);						// ... get rid of this vtx
 	vptr=int_string;						// ... reset our current pointer to the start of the string
 	vold=vptr;							// ... save address of "previous" vertex (sorta)
 	continue;
@@ -1239,15 +1233,13 @@ int slice_linefill(slice *blw_sptr,slice *crt_sptr,slice *abv_sptr,float scanste
       if(vptr->next==NULL)						
         {
 	vold->next=NULL;						// ... set the prev vtx to terminate the string
-	free(vptr);							// ... get rid of this vtx
-	vertex_mem--;							// ... decrement memory tracker
+	vertex_destroy(vptr);						// ... get rid of this vtx
 	break;
 	}
 
       // otherwise this vtx is in the middle of the string...
       vold->next=vptr->next;						// ... set prev vtx to skip over the one we are about to delete
-      free(vptr);							// ... get rid of this vtx
-      vertex_mem--;							// ... decrement memory tracker
+      vertex_destroy(vptr);						// ... get rid of this vtx
       vptr=vold->next;							// ... reset our vertex to the next one in list, vold stays the same
       }
     
@@ -1275,10 +1267,8 @@ int slice_linefill(slice *blw_sptr,slice *crt_sptr,slice *abv_sptr,float scanste
 	}
       else 								// if not long enough, delete the verticies
 	{
-	free(vint);
-	vertex_mem--;
-	free(vold);
-	vertex_mem--;
+	vertex_destroy(vint);
+	vertex_destroy(vold);
 	}
       }
 
@@ -1597,15 +1587,13 @@ int slice_honeycomb(slice *str_sptr, slice *end_sptr, float cell_size, int Ltyp,
 		}
 	      }
 	    vint=vint->next;						// get next vertex from current polygon
-	    free(B);							// release temporary polygon segment vector
-	    vector_mem--;						// decrement memory counter
+	    vector_destroy(B,FALSE);					// release temporary polygon segment vector
 	    }while(vint!=pptr->vert_first);				// end when we've circled all the way back to start
 	  pptr=pptr->next;						// move onto next polygon in this slice
 	  }
 	slpr=slpr->next;						// move onto next slice in the requested list
 	}
-      free(A);
-      vector_mem--;
+      vector_destroy(A,FALSE);
       
       // at this point we have intersected this one hc string segment of fill line with all polygon lines of both slices.
       // we must now sort the intersections from left to right (low to high) in the X then insert that string into 
@@ -1640,8 +1628,7 @@ int slice_honeycomb(slice *str_sptr, slice *end_sptr, float cell_size, int Ltyp,
 	    vint_pos=vsrt;						// this will catch the address of the last element in the intersection list before the loop ends
 	    vsrt=vsrt->next;
 	    }
-	  free(vlst);
-	  vertex_mem--;
+	  vertex_destroy(vlst);
 */
 	  }
 	  
@@ -1657,8 +1644,7 @@ int slice_honeycomb(slice *str_sptr, slice *end_sptr, float cell_size, int Ltyp,
 	vptr=vptr->next;						// move onto next line segment of hc fill line string
 	}
       }while(vptr->next!=NULL);						// end when we've done all of the hc fill string segments
-    free(vnew);								// delete temporary vertex from memory
-    vertex_mem--;							// adjust vertex memory count as such
+    vertex_destroy(vnew);						// delete temporary vertex from memory
 
  
     // at this point the hc string is now broken into segments that are either completely inside polygons or completely outside.
@@ -1737,8 +1723,7 @@ int slice_honeycomb(slice *str_sptr, slice *end_sptr, float cell_size, int Ltyp,
 	vold=vptr;							// save this address for deletion
 	vptr=vptr->next;						// move our current pointer to next vertex
 	hc_string=vptr;							// redefine beginning of rest of hc fill line string
-	free(vold);							// delete this outside vertex
-	vertex_mem--;							// decrement our memory counter
+	vertex_destroy(vold);						// delete this outside vertex
 	vint=hc_string;
 	vold=hc_string;
 	continue;
@@ -2161,9 +2146,10 @@ int slice_deck(model *mptr, int mtyp, int oper_ID)
 	  lptr=linetype_find(slot,ntyp);					// get pointer to line type
 	  if(lptr!=NULL)							// if the pointer was found...
 	    {
+	    min_vector_length=lptr->minveclen;
 	    border_walls=(int)floor(lptr->wall_width/lptr->line_pitch + 0.5); 	// calc number of integer passes required to build wall
 	    border_dist=lptr->line_width*0.5+(border_walls-1)*lptr->line_pitch;	// calc initial position of first pass of wall
-	    if(job.type==ADDITIVE && first_layer_flag==TRUE){border_walls=1;border_dist=lptr->line_width*2.0;} // adjust to elimnate "elephant foot" on first layer.  More walls = less foot.
+	    if(job.type==ADDITIVE && first_layer_flag==TRUE){border_walls=1;border_dist=lptr->line_width*1.5;} // adjust to elimnate "elephant foot" on first layer.  More dist = less foot.
 	    if(fidelity_mode_flag==TRUE){border_walls=1;border_dist=0.001;}
 	    if(fidelity_mode_flag==TRUE && first_layer_flag==FALSE)border_dist=lptr->fidelity_line_width;
 	    while(border_walls>0)						// loop thru all passes required to build wall
@@ -2205,6 +2191,7 @@ int slice_deck(model *mptr, int mtyp, int oper_ID)
 	  lptr=linetype_find(slot,ntyp);
 	  if(lptr!=NULL)
 	    {
+	    min_vector_length=lptr->minveclen;
 	    if(mptr->set_wall_thk<TOLERANCE){mptr->set_wall_thk=lptr->wall_width;}	// if not defined otherwise, use line type width
 	    offset_walls=(int)floor(mptr->set_wall_thk/lptr->line_pitch + 0.5);		// round to closest integer
 	    offset_dist=border_dist+mptr->set_wall_thk-(lptr->line_pitch*0.5);		// calc initial position of first pass of inner most wall
@@ -2290,6 +2277,7 @@ int slice_deck(model *mptr, int mtyp, int oper_ID)
 	  lptr=linetype_find(slot,ntyp);
 	  if(lptr!=NULL)
 	    {
+	    min_vector_length=lptr->minveclen;
 	    //border_walls=(int)(lptr->wall_width/lptr->line_pitch);
 	    //border_dist=lptr->line_width*0.5+mptr->support_gap;		// line width compensation
 	    border_walls=1;
@@ -3003,7 +2991,7 @@ int slice_skeleton(slice *sinpt, int source_typ, int ptyp, float odist)
 	// move onto next vector in source type vec list
 	vec_crt=vec_crt->next;
 	}
-      free(vnew);vertex_mem--;
+      vertex_destroy(vnew);
       ss_wavefront_crtdist=ss_wavefront_increment;
       }
     if(debug_flag==202)printf("  bisectors created...\n");
@@ -3244,7 +3232,7 @@ int slice_skeleton(slice *sinpt, int source_typ, int ptyp, float odist)
 	  }
 	}
       }
-    free(vnew);vertex_mem--;
+    vertex_destroy(vnew);
     ss_wavefront_crtdist=inc_dist;
     if(debug_flag==202)printf("\nSS: exit\n");
     //debug_flag=0;
@@ -3404,9 +3392,7 @@ int slice_offset_skeleton(slice *sinpt, int source_typ, int ptyp, float odist)
 	  {
 	  vecdel=vecptr;
 	  vecptr=vecptr->next;
-	  free(vecdel->tip);vertex_mem--;
-	  free(vecdel->tail);vertex_mem--;
-	  free(vecdel);vector_mem--;
+	  vector_destroy(vecdel,TRUE);
 	  if(vecptr==vl_ptr->v_item)break;
 	  }
 	vl_ptr=vl_ptr->next;
@@ -3478,7 +3464,7 @@ int slice_offset_skeleton(slice *sinpt, int source_typ, int ptyp, float odist)
 	}
       pptr=pptr->next;
       }
-    free(vtest); vertex_mem--;
+    vertex_destroy(vtest);
   }
 
   // sort the new vector list tip to tail.  note that this action will also break the vector list
@@ -3587,9 +3573,7 @@ int slice_offset_skeleton(slice *sinpt, int source_typ, int ptyp, float odist)
 	vecdel=vecptr;
 	vecptr=vecptr->next;
 	if(vecptr==vl_ptr->v_item)break;
-	if(vecdel->tip!=NULL){free(vecdel->tip);vertex_mem--;}
-	if(vecdel->tail!=NULL){free(vecdel->tail);vertex_mem--;}
-	if(vecdel!=NULL){free(vecdel);vector_mem--;}
+	if(vecdel!=NULL){vector_destroy(vecdel,TRUE);}
 	}
       vl_ptr=vl_ptr->next;
       }
@@ -3717,8 +3701,8 @@ int slice_offset_winding(slice *sinpt, int source_typ, int ptyp, float odist)
       vtxnew->z += 1.0;							// give it some z value
       veczup=vector_make(vecptr->tip,vtxnew,0);				// create vector pointing up in z
       vector_crossproduct(vecptr,veczup,vtxcrs);			// get cross product for offset direction
-      free(veczup); vector_mem--; veczup=NULL;				// release from memory
-      free(vtxnew); vertex_mem--; vtxnew=NULL;				// release from memory
+      vector_destroy(veczup,FALSE); veczup=NULL;			// release from memory
+      vertex_destroy(vtxnew); vtxnew=NULL;				// release from memory
       
       // normalize direction vector
       dx=vtxcrs->x;
@@ -3780,7 +3764,7 @@ int slice_offset_winding(slice *sinpt, int source_typ, int ptyp, float odist)
       vecptr=vecptr->next;
       if(vecptr==sinpt->raw_vec_first[source_typ])break;
       }
-    free(vtxcrs); vertex_mem--; vtxcrs=NULL;
+    vertex_destroy(vtxcrs); vtxcrs=NULL;
     //printf("   exiting move and copy:   vec_qty=%ld \n",vector_mem);
   }
 
@@ -3900,9 +3884,9 @@ int slice_offset_winding(slice *sinpt, int source_typ, int ptyp, float odist)
 	  // redefine (trim) end pts to offset pt
 	  vecptr->tail->x=vtxC->x; vecptr->tail->y=vtxC->y;
 	  vecnxt->tip->x=vtxC->x;  vecnxt->tip->y=vtxC->y;  
-	  free(vtxA); vertex_mem--; vtxA=NULL;
-	  free(vtxB); vertex_mem--; vtxB=NULL;
-	  free(vtxC); vertex_mem--; vtxC=NULL;
+	  vertex_destroy(vtxA); vtxA=NULL;
+	  vertex_destroy(vtxB); vtxB=NULL;
+	  vertex_destroy(vtxC); vtxC=NULL;
 	  vector_magnitude(vecptr);
 	  vector_magnitude(vecnxt);
 	  }
@@ -3914,15 +3898,15 @@ int slice_offset_winding(slice *sinpt, int source_typ, int ptyp, float odist)
 	// redefine (trim) end pts to intersection pt
 	vecptr->tail->x=vtxint->x; vecptr->tail->y=vtxint->y;
 	vecnxt->tip->x=vtxint->x;  vecnxt->tip->y=vtxint->y;  
-	free(vtxA); vertex_mem--; vtxA=NULL;
-	free(vtxB); vertex_mem--; vtxB=NULL;
+	vertex_destroy(vtxA); vtxA=NULL;
+	vertex_destroy(vtxB); vtxB=NULL;
 	vector_magnitude(vecptr);
 	vector_magnitude(vecnxt);
 	}
 
       vecptr=vecptr->next;						// move onto next vector
       }
-    free(vtxint); vertex_mem--; vtxint=NULL;
+    vertex_destroy(vtxint); vtxint=NULL;
     //printf("  raw_vec_qty[ptyp]=%ld  vectors after offset connections made\n",sinpt->raw_vec_qty[ptyp]);
     //printf("   exiting corner connect:   vec_qty=%ld \n",vector_mem);
   }
@@ -3979,7 +3963,7 @@ int slice_offset_winding(slice *sinpt, int source_typ, int ptyp, float odist)
 	}
       vecptr=vecptr->next;
       }
-    free(vtxint); vertex_mem--; vtxint=NULL;
+    vertex_destroy(vtxint); vtxint=NULL;
     //printf("  raw_vec_qty[ptyp]=%ld  vectors after intersecitons found\n",sinpt->raw_vec_qty[ptyp]);
     //printf("   enxiting break intersects:   vec_qty=%ld \n",vector_mem);
   }
@@ -4025,9 +4009,7 @@ int slice_offset_winding(slice *sinpt, int source_typ, int ptyp, float odist)
 	
 	vecdel=vecptr;
 	vecptr=vecptr->next;
-	free(vecdel->tip);  vertex_mem--; vecdel->tip=NULL;
-	free(vecdel->tail); vertex_mem--; vecdel->tail=NULL;
-	free(vecdel); vector_mem--; vecdel=NULL;
+	vector_destroy(vecdel,TRUE); vecdel=NULL;
 	sinpt->raw_vec_qty[ptyp]--;
 	
 	if(vecptr==NULL)break;
@@ -4303,11 +4285,11 @@ int slice_offset_winding_by_polygon(slice *sinpt, int source_typ, int ptyp, floa
 	// getting the cross product.  since hole boundaries move opposite (ccw) to material boundaries (cw)
 	// just adding positive z will automatically provide correct offset direction.
 	vtxnew=vertex_copy(vecptr->tip,NULL);				// make copy of tip vtx
-	vtxnew->z += 1.0;							// give it some z value
-	veczup=vector_make(vecptr->tip,vtxnew,0);				// create vector pointing up in z
+	vtxnew->z += 1.0;						// give it some z value
+	veczup=vector_make(vecptr->tip,vtxnew,0);			// create vector pointing up in z
 	vector_crossproduct(vecptr,veczup,vtxcrs);			// get cross product for offset direction
-	free(veczup); vector_mem--; veczup=NULL;				// release from memory
-	free(vtxnew); vertex_mem--; vtxnew=NULL;				// release from memory
+	vector_destroy(veczup,FALSE); veczup=NULL;			// release from memory
+	vertex_destroy(vtxnew); vtxnew=NULL;				// release from memory
 	
 	// normalize direction vector
 	dx=vtxcrs->x;
@@ -4364,7 +4346,7 @@ int slice_offset_winding_by_polygon(slice *sinpt, int source_typ, int ptyp, floa
 	vecptr=vecptr->next;
 	if(vecptr==sinpt->raw_vec_first[source_typ])break;
 	}
-      free(vtxcrs); vertex_mem--; vtxcrs=NULL;
+      vertex_destroy(vtxcrs); vtxcrs=NULL;
       //printf("   exiting move and copy:   vec_qty=%ld \n",vector_mem);
     }
   
@@ -4478,9 +4460,9 @@ int slice_offset_winding_by_polygon(slice *sinpt, int source_typ, int ptyp, floa
 	    // redefine (trim) end pts to offset pt
 	    vecptr->tail->x=vtxC->x; vecptr->tail->y=vtxC->y;
 	    vecnxt->tip->x=vtxC->x;  vecnxt->tip->y=vtxC->y;  
-	    free(vtxA); vertex_mem--; vtxA=NULL;
-	    free(vtxB); vertex_mem--; vtxB=NULL;
-	    free(vtxC); vertex_mem--; vtxC=NULL;
+	    vertex_destroy(vtxA); vtxA=NULL;
+	    vertex_destroy(vtxB); vtxB=NULL;
+	    vertex_destroy(vtxC); vtxC=NULL;
 	    vector_magnitude(vecptr);
 	    vector_magnitude(vecnxt);
 	    }
@@ -4492,15 +4474,15 @@ int slice_offset_winding_by_polygon(slice *sinpt, int source_typ, int ptyp, floa
 	  // redefine (trim) end pts to intersection pt
 	  vecptr->tail->x=vtxint->x; vecptr->tail->y=vtxint->y;
 	  vecnxt->tip->x=vtxint->x;  vecnxt->tip->y=vtxint->y;  
-	  free(vtxA); vertex_mem--; vtxA=NULL;
-	  free(vtxB); vertex_mem--; vtxB=NULL;
+	  vertex_destroy(vtxA); vtxA=NULL;
+	  vertex_destroy(vtxB); vtxB=NULL;
 	  vector_magnitude(vecptr);
 	  vector_magnitude(vecnxt);
 	  }
   
 	vecptr=vecptr->next;						// move onto next vector
 	}
-      free(vtxint); vertex_mem--; vtxint=NULL;
+      vertex_destroy(vtxint); vtxint=NULL;
       //printf("  raw_vec_qty[ptyp]=%ld  vectors after offset connections made\n",sinpt->raw_vec_qty[ptyp]);
       //printf("   exiting corner connect:   vec_qty=%ld \n",vector_mem);
     }
@@ -4551,7 +4533,7 @@ int slice_offset_winding_by_polygon(slice *sinpt, int source_typ, int ptyp, floa
 	  }
 	vecptr=vecptr->next;
 	}
-      free(vtxint); vertex_mem--; vtxint=NULL;
+      vertex_destroy(vtxint); vtxint=NULL;
       //printf("  raw_vec_qty[ptyp]=%ld  vectors after intersecitons found\n",sinpt->raw_vec_qty[ptyp]);
       //printf("   enxiting break intersects:   vec_qty=%ld \n",vector_mem);
     }
@@ -4593,9 +4575,7 @@ int slice_offset_winding_by_polygon(slice *sinpt, int source_typ, int ptyp, floa
 	  
 	  vecdel=vecptr;
 	  vecptr=vecptr->next;
-	  free(vecdel->tip);  vertex_mem--; vecdel->tip=NULL;
-	  free(vecdel->tail); vertex_mem--; vecdel->tail=NULL;
-	  free(vecdel); vector_mem--; vecdel=NULL;
+	  vector_destroy(vecdel,TRUE); vecdel=NULL;
 	  sinpt->raw_vec_qty[ptyp]--;
 	  
 	  if(vecptr==NULL)break;
@@ -4828,9 +4808,7 @@ vector *vector_del_from_list(vector *veclist, vector *vecdel)
     if(vecnxt!=NULL)vecnxt->prev=vecpre;				// ... redefine next's prev to skip over vecdel
     if(vecpre!=NULL)vecpre->next=vecnxt;				// ... redefine prev's next to skip over vecdel
     }
-  free(vecdel->tip);  vertex_mem--;
-  free(vecdel->tail); vertex_mem--;
-  free(vecdel);       vector_mem--;
+  vector_destroy(vecdel,TRUE);
     
   return(head_of_list);
 }

@@ -389,8 +389,7 @@ int stl_model_load(model *mptr)
 	{
 	if(vertex_compare(vptr,vnewA,mptr->facet_prox_tol)==TRUE)	// if a vtx already exists at this location...
 	  {
-	  free(vnewA);							// ... free memory of one that was created
-	  vertex_mem--;							// ... decrement vertex in memory counter
+	  vertex_destroy(vnewA);					// ... free memory of one that was created
 	  vnewA=vptr;							// ... and instead have it point to the existing match
 	  vAfound=TRUE;							// ... set flag to indicate match was found
 	  break;							// ... get out of loop.  no need to keep scanning.
@@ -419,8 +418,7 @@ int stl_model_load(model *mptr)
 	{
 	if(vertex_compare(vptr,vnewB,mptr->facet_prox_tol)==TRUE)	// if a vtx already exists at this location...
 	  {
-	  free(vnewB);							// ... free memory of one that was created
-	  vertex_mem--;							// ... decrement vertex in memory counter
+	  vertex_destroy(vnewB);					// ... free memory of one that was created
 	  vnewB=vptr;							// ... and instead have it point to the existing match
 	  vBfound=TRUE;
 	  break;
@@ -449,8 +447,7 @@ int stl_model_load(model *mptr)
 	{
 	if(vertex_compare(vptr,vnewC,mptr->facet_prox_tol)==TRUE)	// if a vtx already exists at this location...
 	  {
-	  free(vnewC);							// ... free memory of one that was created
-	  vertex_mem--;							// ... decrement vertex in memory counter
+	  vertex_destroy(vnewC);					// ... free memory of one that was created
 	  vnewC=vptr;							// ... and instead have it point to the existing match
 	  vCfound=TRUE;
 	  break;
@@ -539,7 +536,7 @@ int stl_model_load(model *mptr)
 	  {vold->next=vptr->next;}						// ... skip over vtx to be deleted
 	vdel=vptr;								// ... set vtx to delete
 	vptr=vptr->next;							// ... assign to next vtx in list
-	free(vdel); vertex_mem--; j++;						// ... release from memory and update count in memory
+	vertex_destroy(vdel); j++;						// ... release from memory and update count in memory
 	}
       else 
         {

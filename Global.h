@@ -24,8 +24,8 @@
 
 // Defines for version control
 #define AA4X3D_MAJOR_VERSION 0
-#define AA4X3D_MINOR_VERSION 625
-#define AA4X3D_MICRO_VERSION 2
+#define AA4X3D_MINOR_VERSION 702
+#define AA4X3D_MICRO_VERSION 1
 
 // Defines for math
 #define PI 3.14159
@@ -433,6 +433,12 @@
   #define TOOL_C_LOOP 25
   #define TOOL_D_LOOP 25
 #endif
+
+// TinyG interface
+#define HOLDING_TQ_ALWAYS_OFF 0
+#define HOLDING_TQ_ALWAYS_ON 1
+#define HOLDING_TQ_IN_CYCLE 2
+#define HOLDING_TQ_IN_MOVE 3
 
 // Thermal sensor type defines
 #define ONEWIRE 1							// 1wire temp sensor... cannot get very hot
@@ -1778,8 +1784,9 @@ extern void update_size_values(model *mnew);
 // Functions located in Model_Data.c
 extern int memory_status(void);
 extern vertex *vertex_make(void);
-extern int vertex_insert(model *mptr, vertex *local, vertex *vertexnew, int typ);// inserts a vertex into a model
+extern int vertex_insert(model *mptr, vertex *local, vertex *vertexnew, int typ);
 extern vertex *vertex_unique_insert(model *mptr, vertex *local, vertex *vertexnew, int typ, float tol);
+extern int vertex_destroy(vertex *vdel);
 extern int vertex_delete(model *mptr, vertex *vdel, int typ);
 extern int vertex_redundancy_check(vertex *vtxlist);
 extern vertex *vertex_copy(vertex *vptr, vertex *vnxt);
@@ -1799,15 +1806,18 @@ extern vertex *vertex_match_ID(vertex *vtest,polygon *pA);
 extern vertex *vertex_previous(vertex *vtest,polygon *pA);
 extern vertex_list *vertex_neighbor_list(vertex *vinpt);
 extern vertex_list *vertex_list_make(vertex *vinpt);
+extern int vertex_list_destroy(vertex_list *vl_del);
 extern vertex_list *vertex_list_manager(vertex_list *vlist, vertex *vinpt, int action);
 extern vertex *vertex_list_add_unique(vertex_list *vl_inpt, vertex *vtx_inpt);
 
 extern edge *edge_make(void);
 extern edge *edge_copy(edge *einp);
 extern int edge_insert(model *mptr, edge *local, edge *edgenew, int typ);
+extern int edge_destroy(edge *edel);
 extern int edge_delete(model *mptr, edge *edel, int typ);
 extern int edge_purge(edge *elist);
 extern edge_list *edge_list_make(edge *einpt);
+extern int edge_list_destroy(edge_list *el_del);
 extern edge_list *edge_list_manager(edge_list *elist, edge *einpt, int action);
 extern edge *edge_angle_id(edge *inp_edge_list,float inp_angle);	// creates edge list based on neighboring facet angles
 extern int edge_compare(edge *A, edge *B);
@@ -1818,6 +1828,7 @@ extern int edge_dump(model *mptr);
 
 extern facet *facet_make(void);
 extern int facet_insert(model *mptr, facet *local, facet *facetnew, int typ);
+extern int facet_destroy(facet *fdel);
 extern int facet_delete(model *mptr, facet *fdel, int typ);
 extern int facet_purge(facet *flist);
 extern int facet_normal(facet *finp);
@@ -1901,6 +1912,7 @@ extern int job_build_tree_support(void);
 extern vector *vector_make(vertex *A, vertex *B, int typ);		// allocates memory for a single vector
 extern int vector_insert(slice *sptr, int ptyp, vector *vecnew);	// inserts a single vector into linked list
 extern int vector_raw_insert(slice *sptr, int ptyp, vector *vecnew);
+extern int vector_destroy(vector *vecdel, int vtx_ends);
 extern vector *vector_delete(vector *veclist, vector *vdel);		// deletes a single vector from linked list
 extern vector *vector_wipe(vector *vec_list, int del_typ);
 extern vector *vector_copy(vector *vec_src);

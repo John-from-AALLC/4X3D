@@ -1553,7 +1553,7 @@ void grab_xdist_value(GtkSpinButton *button, gpointer user_data)
   vptr=vertex_make();
   vptr->x=move_x; vptr->y=move_y; vptr->z=move_z;
   make_test_move(slot,vptr);
-  free(vptr); vertex_mem--;
+  vertex_destroy(vptr);
     
   return;
 }
@@ -1568,7 +1568,7 @@ void grab_ydist_value(GtkSpinButton *button, gpointer user_data)
   vptr=vertex_make();
   vptr->x=move_x; vptr->y=move_y; vptr->z=move_z;
   make_test_move(slot,vptr);
-  free(vptr); vertex_mem--;
+  vertex_destroy(vptr);
     
   return;
 }
@@ -1589,7 +1589,7 @@ void grab_zdist_value(GtkSpinButton *button, gpointer user_data)
   vptr=vertex_make();
   vptr->x=move_x; vptr->y=move_y; vptr->z=move_z;
   make_test_move(slot,vptr);
-  free(vptr); vertex_mem--;
+  vertex_destroy(vptr);
     
   return;
 }
@@ -1683,7 +1683,7 @@ int on_min_callback(GtkWidget *btn_call, gpointer user_data)
     vptr=vertex_make();
     vptr->x=move_x; vptr->y=move_y; vptr->z=move_z;
     make_test_move(slot,vptr);
-    free(vptr); vertex_mem--;
+    vertex_destroy(vptr);
     
     return(1);
 }
@@ -1716,7 +1716,7 @@ int on_mid_callback(GtkWidget *btn_call, gpointer user_data)
     vptr=vertex_make();
     vptr->x=move_x; vptr->y=move_y; vptr->z=move_z;
     make_test_move(slot,vptr);
-    free(vptr); vertex_mem--;
+    vertex_destroy(vptr);
     
     return(1);
 }
@@ -1749,7 +1749,7 @@ int on_max_callback(GtkWidget *btn_call, gpointer user_data)
     vptr=vertex_make();
     vptr->x=move_x; vptr->y=move_y; vptr->z=move_z;
     make_test_move(slot,vptr);
-    free(vptr); vertex_mem--;
+    vertex_destroy(vptr);
     
     return(1);
 }

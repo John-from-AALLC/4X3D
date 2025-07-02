@@ -30,13 +30,12 @@ int print_vertex(vertex *vptr, int slot, int pmode, linetype *lptr)
   print_thread_alive=1;							// set to indicate this function still alive
   if(vptr!=NULL)VId++;							// increment vertex count
   
-  // record last on part vtx for return from pause
+  // record last on part vtx for return from pause.  vtx_last_printed is a re-usable global for this purpose.
   if(vptr!=NULL && on_part_flag==TRUE)
     {
-    vtx_last_printed->x=vptr->x;
-    vtx_last_printed->y=vptr->y;
-    vtx_last_printed->z=vptr->z;
-    vtx_last_printed->attr=vptr->attr;
+    vtx_last_printed->x=vptr->x; vtx_last_printed->y=vptr->y; vtx_last_printed->z=vptr->z;
+    vtx_last_printed->i=vptr->i; vtx_last_printed->j=vptr->j; vtx_last_printed->k=vptr->k;
+    vtx_last_printed->attr=vptr->attr; vtx_last_printed->supp=vptr->supp; 
     }
 
   // if in abort job mode...
@@ -181,9 +180,9 @@ int print_vertex(vertex *vptr, int slot, int pmode, linetype *lptr)
 
   // determine the effective distance of the whole move.  Note the head moves in ALL 3 AXES.
   // if shorter than mimium then just skip, effectively combining with next vertex in list
-  curDist=sqrt(dx*dx + dy*dy)+dz;					// note the "+dz" to not eliminate pure z moves
   if(adjlen<0.08)adjlen=0.08;						// min line length of tinyG is 0.08
-  if(fabs(dz)<CLOSE_ENOUGH && curDist<adjlen && job.type==ADDITIVE)	// if move too small...
+  curDist=sqrt(dx*dx + dy*dy);						// length of xy move
+  if(fabs(dz)<CLOSE_ENOUGH && curDist<adjlen && job.type==ADDITIVE)	// if NOT a z move and move is too small...
     {
     PosIs.x=PosWas.x;PosIs.y=PosWas.y;PosIs.z=PosWas.z;			// restore values to current location
     printf("\nSmall move requested!  %f vs %f Continuing.\n\n",curDist,adjlen);
@@ -788,6 +787,7 @@ int print_status(jobx *local_job)
     }
 
   // wait in this loop until the job state is changed by user
+  printf("\nPrint paused.  Awaiting user command.\n");
   old_job_state=job.state;
   while(job.state==old_job_state)					// while nothing has changed...
     {
@@ -795,6 +795,7 @@ int print_status(jobx *local_job)
     g_main_context_iteration(NULL, FALSE);				// poll for UI changes
     delay(100);								// don't hammer system with this loop
     }
+  printf("\nUser command received.  Processing command.\n");
    
   // resume once user changes state back to running
   if(job.state==JOB_RUNNING)
@@ -1280,7 +1281,7 @@ int motion_complete(void)
     sprintf(gcode_cmd,"{\"qr\":null}\n");				// req buffer report
     tinyGSnd(gcode_cmd);						// send request
     while(tinyGRcv(0)==0);						// get tinyg feedback - this will update position if moving
-    if((MAX_BUFFER-bufferAvail)<2)break;				// leave as soon as possible
+    if((MAX_BUFFER-bufferAvail)<1)break;				// leave as soon as possible
     
     // calc change in position. if any change reset start time
     dx=fabs(oldx-PostG.x); dy=fabs(oldy-PostG.y);			// calc change in position
@@ -1290,9 +1291,9 @@ int motion_complete(void)
     // get current time
     time_now=time(NULL);
     
-    // if no motion for more than 2 secs... clear buffer and exit.
+    // if no motion for more than 2 sec... clear buffer and exit.
     // not known why tinyG does not completely clear buffer some times, but when a value of "1" persists
-    // it seems to stay there regardless of how many move are queued up subsequently.  clearing and
+    // it seems to stay there regardless of how many moves are queued up subsequently.  clearing and
     // moving on seems to be harmless.
     if((time_now - time_start)>2 && (dx+dy+dz+da)<CLOSE_ENOUGH)
       {
@@ -1341,8 +1342,7 @@ int motion_complete(void)
       // get current time
       time_now=time(NULL);
     
-      // if no motion for more than 2 secs...
-      //if((time_now - time_start)>2 && (dx+dy+dz+da)<CLOSE_ENOUGH)status=FALSE;
+      // if no motion for more than 2 sec...
       if((time_now - time_start)>2 && (dx+dy+dz+da)<CLOSE_ENOUGH)break;
       
       // if dormant for more than max allowed...
@@ -1587,7 +1587,7 @@ int goto_machine_home(void)
     PosIs.z=PostG.z;
 
     printf("\nTurning off holding torque: \n");
-    set_holding_torque(OFF);
+    set_holding_torque(HOLDING_TQ_ALWAYS_OFF);
     printf("\n");
     
     carriage_at_home=TRUE;
@@ -1605,7 +1605,7 @@ int comefrom_machine_home(int slot, vertex *vtarget)
     if(vtarget==NULL)return(0);
 
     printf("\nTurning on holding torque: \n");
-    set_holding_torque(ON);
+    set_holding_torque(HOLDING_TQ_ALWAYS_ON);
     printf("\n");
 
     #if defined(ALPHA_UNIT) || defined(BETA_UNIT)			// because home position is at z=0 we must raise z to not scrape across build table
@@ -1636,7 +1636,7 @@ int comefrom_machine_home(int slot, vertex *vtarget)
     memset(gcode_burst,0,sizeof(gcode_burst));				// null out burst string
     motion_complete();
     
-    free(vmid); vertex_mem--; vmid=NULL;				// release temporary vtx from memeory
+    vertex_destroy(vmid); vmid=NULL;					// release temporary vtx from memeory
     carriage_at_home=FALSE;
     
     return(1);
@@ -1931,8 +1931,8 @@ void* build_job(void *arg)
 	tool_tip_retract(slot);						// retract tool tip away from build table
 	      
 	// release calibration line coordinates from memory
-	free(vcal_start); vertex_mem--;
-	free(vcal_end);	vertex_mem--;
+	vertex_destroy(vcal_start);
+	vertex_destroy(vcal_end);
 	Tool[slot].state=TL_READY;					// shift state from active back to ready
 	linet_state[slot]=UNDEFINED;
 
@@ -2449,8 +2449,7 @@ void* build_job(void *arg)
 		      }
 		    pptr=pptr->next;
 		    }
-		  free(vptr);
-		  vertex_mem--;
+		  vertex_destroy(vptr);
 		  tool_tip_retract(slot);
 		  make_toolchange(slot,1);					// make tool change to matl drive at start of every layer
 		  drill_holes_done_flag=1;					// all polys have already been drilled
@@ -2547,19 +2546,19 @@ void* build_job(void *arg)
 		  if(local_job.state!=JOB_RUNNING)break;			// account for nested loop break request
 		  
 		  if(pptr->hole==2){pptr=pptr->next;continue;}			// if a drilled hole, then skip it - it was done above
+		  
 		  if(ptyp==MDL_PERIM && pptr->perim_type==2)			// if custom settings for this poly need to be applied...
 		    {if(pptr->perim_lt!=NULL)lptr=pptr->perim_lt;}		// ... reset line type pointer to one specific to this poly
+		    
 		  if(ptyp==MDL_FILL && pptr->fill_type==2)			// if custom settings for this poly need to be applied...
 		    {if(pptr->fill_lt!=NULL)lptr=pptr->fill_lt;}		// ... reset line type pointer to one specific to this poly
-		  //if(first_layer_flag==TRUE && ptyp==MDL_LAYER_1 && pptr->vert_qty>3) 	// if first layer and a perimeter/border/offset poly...
-		  //  {pptr=pptr->next; continue;}					// ... skip it as it causes elephant foot type defects
 		  
 		  cmdBurst=1;							// set the number of cmds to be sent to tinyG in one burst
 		  if(cmdBurst>pptr->vert_qty)cmdBurst=pptr->vert_qty;		// if greater than what's in this poly, set to max in poly
 		  if(Tool[slot].type==SUBTRACTIVE)cmdBurst=1;			// only send one move at a time to allow instant pause if routing
 		  burst_ctr=0;							// init burst counter to count down bursted cmds
 		  vector_count=0;						// init vector counter used to count up number of vtx sent to tinyG in this polygon
-		  vtx_overlap=set_vtx_overlap;					// set the number of vtxs to overlap on borders/offsets to fix start/stop seam
+		  vtx_overlap=set_vtx_overlap;					// set the number of vtxs to overlap on borders/offsets to mitigate start/stop seam
 		  if(pptr->vert_qty<3)vtx_overlap=0;				// if just a fill line, reset to 0
 		  if(local_job.type==SUBTRACTIVE)vtx_overlap=0;
 		  if(local_job.type==MARKING)vtx_overlap=0;
@@ -2943,7 +2942,7 @@ void* build_job(void *arg)
 	  print_vertex(vtx_aside,slot,2,NULL);				// build command
 	  tinyGSnd(gcode_burst);					// send string of commands to fill buffer
 	  memset(gcode_burst,0,sizeof(gcode_burst));			// null out burst string
-	  free(vtx_aside); vertex_mem--; vtx_aside=NULL;
+	  vertex_destroy(vtx_aside); vtx_aside=NULL;
 	  
 	  // record image and save
 	  strcpy(bashfn,"#!/bin/bash\nsudo libcamera-jpeg -v 0 -n 1 -t 10 ");	// define base camera command
@@ -2982,7 +2981,7 @@ void* build_job(void *arg)
       }	  // end of while TRUE loop that controls printer actions
       
     // at this point the job is either completed or aborted.
-    // clean up end-of-job params and set status to not run in this thread.
+    // clean up end of job params and set status to not run in this thread.
     motion_complete();							// make sure last move is finished
     for(slot=0;slot<MAX_TOOLS;slot++)
       {
@@ -3000,7 +2999,8 @@ void* build_job(void *arg)
     //save_unit_state();
     if(save_logfile_flag==TRUE)close_job_log();				// if saving logfile, close it here
     fclose(print_log);
-    job.state=local_job.state;
+    job.state=local_job.state;						// default to state of local
+    if(local_job.state==JOB_RUNNING)job.state=JOB_COMPLETE;		// if finished normally... set to complete
     job.current_z=local_job.current_z;
     job.current_dist=local_job.current_dist;
     job.total_dist=local_job.total_dist;

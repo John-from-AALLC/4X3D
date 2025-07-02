@@ -144,7 +144,7 @@ int on_tool_change (GtkWidget *btn, gpointer user_data)
   
   // clean up
   active_model=old_active;
-  free(vptr); vertex_mem--; vptr=NULL;
+  vertex_destroy(vptr); vptr=NULL;
   printf("Tool Change: exit \n");
 
   return(TRUE);
@@ -447,7 +447,7 @@ void xyztip_next_callback (GtkWidget *btn, gpointer user_data)
   tinyGSnd(gcode_cmd);
   while(tinyGRcv(1)>=0);
 
-  free(vptr);vertex_mem--;
+  vertex_destroy(vptr);
   
   return;
 }
@@ -891,8 +891,8 @@ void xyztip_autocal_callback (GtkWidget *btn, gpointer user_data)
 	}
 
       // clean up before moving onto next tool
-      free(szx); vertex_mem--; szx=NULL;
-      free(szy); vertex_mem--; szy=NULL;
+      vertex_destroy(szx); szx=NULL;
+      vertex_destroy(szy); szy=NULL;
       
       }	// end of slot incrment for loop
       
@@ -1092,7 +1092,7 @@ void xyztip_manualcal_callback(GtkWidget *btn, gpointer user_data)
     memset(gcode_burst,0,sizeof(gcode_burst));	
     motion_complete();
   
-    free(vptr);vertex_mem--;						// release memory
+    vertex_destroy(vptr);
     }
 
   //active_model=old_active_model;
@@ -2849,10 +2849,10 @@ void zoff_test_callback (GtkWidget *btn, gpointer user_data)
   tinyGSnd(gcode_burst);						// send commands to motion controller
   memset(gcode_burst,0,sizeof(gcode_burst));	
   motion_complete();
-  free(v0); vertex_mem--; v0=NULL;
-  free(v1); vertex_mem--; v1=NULL;
-  free(v2); vertex_mem--; v2=NULL;
-  free(v3); vertex_mem--; v3=NULL;
+  vertex_destroy(v0); v0=NULL;
+  vertex_destroy(v1); v1=NULL;
+  vertex_destroy(v2); v2=NULL;
+  vertex_destroy(v3); v3=NULL;
   
   return;
 }
@@ -2884,7 +2884,7 @@ void zoff_up_callback(GtkWidget *btn_call, gpointer user_data)
   tinyGSnd(gcode_burst);			
   memset(gcode_burst,0,sizeof(gcode_burst));	
   motion_complete();
-  free(vptr); vertex_mem--; vptr=NULL;
+  vertex_destroy(vptr); vptr=NULL;
 
   // update dialog label
   sprintf(scratch,"  Current Height: %7.3f  ",zoffset);
@@ -2922,7 +2922,7 @@ void zoff_dn_callback(GtkWidget *btn_call, gpointer user_data)
   tinyGSnd(gcode_burst);			
   memset(gcode_burst,0,sizeof(gcode_burst));	
   motion_complete();
-  free(vptr); vertex_mem--; vptr=NULL;
+  vertex_destroy(vptr); vptr=NULL;
 
   // update dialog label
   sprintf(scratch,"  Current Height: %7.3f  ",zoffset);
@@ -3308,7 +3308,7 @@ int tool_add_matl(GtkWidget *btn, gpointer user_data)
 
     // spin up router
     tool_power_ramp(slot,TOOL_48V_PWM,(int)(100*Tool[slot].powr.power_duty));
-    free(vptr); vertex_mem--; vptr=NULL;
+    vertex_destroy(vptr); vptr=NULL;
     }
     
   // heat lamp
@@ -4586,8 +4586,8 @@ int build_mat_file(GtkWidget *btn_call, gpointer user_data)
 
   job.state=JOB_COMPLETE;
   goto_machine_home();
-  free(vtx_st); vertex_mem--;
-  free(vtx_end); vertex_mem--;
+  vertex_destroy(vtx_st);
+  vertex_destroy(vtx_end);
   if(mdlptr!=NULL)active_model=mdlptr;
   
   return(1);

@@ -1483,10 +1483,8 @@ int gerber_trace_polygon(slice *sptr, gbr_aperature *cap, vertex *trace)
     odist=cap->diam/2.0;
     if(odist<=0)odist=0.25;
     newdist=odist/sa;
-    free(vecA);
-    vector_mem--;
-    free(vecB);
-    vector_mem--;
+    vector_destroy(vecA,FALSE);
+    vector_destroy(vecB,FALSE);
     
     // now adjust the magnitude of the bisector vector 
     dxC=vnew->x - vbase->x;
@@ -1530,8 +1528,8 @@ int gerber_trace_polygon(slice *sptr, gbr_aperature *cap, vertex *trace)
       vec_ss->tail=vec_ss->tip;
       vec_ss->tip=vtxA;
       }
-    free(vecA);vector_mem--;
-    free(vecB);vector_mem--;
+    vector_destroy(vecA,FALSE);
+    vector_destroy(vecB,FALSE);
     
     // move onto next vertex
     vnold=vnew;								// save address for linked listing

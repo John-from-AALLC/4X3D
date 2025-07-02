@@ -596,7 +596,7 @@ float job_time_estimate_simulator(void)
   entry_system_log(scratch);
   
   // clean up
-  free(vorigin); vertex_mem--; vorigin=NULL;
+  vertex_destroy(vorigin); vorigin=NULL;
   
   // hide progress bar
   gtk_widget_set_visible(win_info,FALSE);
@@ -1069,6 +1069,7 @@ int job_clear(void)
   for(i=0;i<MAX_MDL_TYPES;i++)job.lfacet_upfacing[i]=NULL;
   
   zoffset=0.0;
+  active_model=NULL;
   
   // clear existing history since this is possible a re-start/re-run
   for(i=0;i<=HIST_MATL;i++)hist_ctr[i]=0;				// clear time and matl counter values
@@ -1078,14 +1079,8 @@ int job_clear(void)
     }
   
   // reset views
-  MVview_scale=2.0; 
-  MVgxoffset=425; 
-  MVgyoffset=375; 
-  MVdisp_spin=(-37*PI/180); 
-  MVdisp_tilt=(210*PI/180);
-  LVview_scale=1.70;			
-  LVgxoffset=255;
-  LVgyoffset=(-530); 
+  {MVview_scale=1.2; MVgxoffset=425; MVgyoffset=375; MVdisp_spin=(-37*PI/180); MVdisp_tilt=(210*PI/180);}
+  {LVview_scale=1.00; LVgxoffset=155; LVgyoffset=(-490);}
   
   // clear job display
   //if(main_view_page==VIEW_TOOL)
@@ -2179,11 +2174,11 @@ int job_build_grid_support(void)
       
     // clean up
     free(fctedge); polygon_mem--; fctedge=NULL;
-    free(vtx_f0); vertex_mem--; vtx_f0=NULL;
-    free(vtx_f1); vertex_mem--; vtx_f1=NULL;
-    free(vtx_f2); vertex_mem--; vtx_f2=NULL;
-    free(vtxD); vertex_mem--; vtxD=NULL;
-    free(vtxint); vertex_mem--; vtxint=NULL;
+    vertex_destroy(vtx_f0); vtx_f0=NULL;
+    vertex_destroy(vtx_f1); vtx_f1=NULL;
+    vertex_destroy(vtx_f2); vtx_f2=NULL;
+    vertex_destroy(vtxD);   vtxD=NULL;
+    vertex_destroy(vtxint); vtxint=NULL;
 
     printf("  lower model patches identified.\n");
   }
@@ -2348,7 +2343,7 @@ int job_build_grid_support(void)
 		    {
 		    patch_find_z(patptr,vtxnew[i]);
 		    vtx_ptr=vertex_unique_insert(mptr,mptr->vertex_last[SUPPORT],vtxnew[i],SUPPORT,CLOSE_ENOUGH);
-		    if(vtx_ptr!=vtxnew[i]){free(vtxnew[i]); vertex_mem--; vtxnew[i]=vtx_ptr;}
+		    if(vtx_ptr!=vtxnew[i]){vertex_destroy(vtxnew[i]); vtxnew[i]=vtx_ptr;}
 		    }
 		  }
 		  
@@ -2458,7 +2453,7 @@ int job_build_grid_support(void)
 		  if(vtx_in[i]==TRUE)
 		    {
 		    vtx_ptr=vertex_unique_insert(mptr,mptr->vertex_last[SUPPORT],vtxlow[i],SUPPORT,CLOSE_ENOUGH);
-		    if(vtx_ptr!=vtxlow[i]){free(vtxlow[i]); vertex_mem--; vtxlow[i]=vtx_ptr;}
+		    if(vtx_ptr!=vtxlow[i]){vertex_destroy(vtxlow[i]); vtxlow[i]=vtx_ptr;}
 		    }
 		  }
       
@@ -2510,8 +2505,8 @@ int job_build_grid_support(void)
 		  {
 		  if(vtx_in[i]==FALSE)
 		    {
-		    free(vtxnew[i]); vertex_mem--; vtxnew[i]=NULL;
-		    free(vtxlow[i]); vertex_mem--; vtxlow[i]=NULL;
+		    vertex_destroy(vtxnew[i]); vtxnew[i]=NULL;
+		    vertex_destroy(vtxlow[i]); vtxlow[i]=NULL;
 		    }
 		  }
 		  
@@ -2519,7 +2514,7 @@ int job_build_grid_support(void)
 	      else 
 		{
 		// delete all test vtxs since all not in patch
-		for(i=0;i<4;i++){free(vtxnew[i]); vertex_mem--; vtxnew[i]=NULL;}
+		for(i=0;i<4;i++){vertex_destroy(vtxnew[i]); vtxnew[i]=NULL;}
 		}
 	      }	// end of make_facet==TRUE decision
 	      
@@ -2536,7 +2531,7 @@ int job_build_grid_support(void)
       }
       
     // clean up
-    free(vtxint); vertex_mem--; vtxint=NULL;
+    vertex_destroy(vtxint); vtxint=NULL;
     
     printf("  upper and lower support facets generated.\n");
 
@@ -2694,7 +2689,7 @@ int job_build_grid_support(void)
       }
 
     // clean up
-    free(vtxD); vertex_mem--; vtxD=NULL;
+    vertex_destroy(vtxD); vtxD=NULL;
     
     printf("  wall support facets made.\n");
   }
@@ -2901,8 +2896,8 @@ int job_build_tree_support(void)
         {
 	brdel=brptr;
 	brptr=brptr->next;
-	if(brdel->node!=NULL){free(brdel->node); vertex_mem--;}
-	if(brdel->goal!=NULL){free(brdel->goal); vertex_mem--;}
+	if(brdel->node!=NULL){vertex_destroy(brdel->node);}
+	if(brdel->goal!=NULL){vertex_destroy(brdel->goal);}
 	free(brdel);
 	}
       job.support_tree=NULL;
@@ -3222,7 +3217,7 @@ int job_build_tree_support(void)
 		
 	      if(make_node==FALSE)						// if support was not neeeded, delete working vtx as it is not used as a node
 		{
-		if(vtx_new!=NULL){free(vtx_new); vertex_mem--; vtx_new=NULL;}
+		if(vtx_new!=NULL){vertex_destroy(vtx_new); vtx_new=NULL;}
 		}
 		
 	      rem_dist = 0.0;							// reset since new vtx just added
@@ -3343,7 +3338,7 @@ int job_build_tree_support(void)
       }
       
     // clean up
-    free(vtxint); vertex_mem--; vtxint=NULL;
+    vertex_destroy(vtxint); vtxint=NULL;
     
   }	// end of step  2
   
@@ -3464,10 +3459,10 @@ int job_build_tree_support(void)
 	}
       mptr=mptr->next;
       }
-    if(vrtn!=NULL){free(vrtn); vertex_mem--; vrtn=NULL;}
+    if(vrtn!=NULL){vertex_destroy(vrtn); vrtn=NULL;}
      
     // clean up
-    if(vtx_temp!=NULL){free(vtx_temp); vertex_mem--; vtx_temp=NULL;}
+    if(vtx_temp!=NULL){vertex_destroy(vtx_temp); vtx_temp=NULL;}
     
     // sort the branch linked list by highest z value. highest z value is first in list.
     branch_sort(temp_tree);
@@ -3698,8 +3693,8 @@ int job_build_tree_support(void)
       
       }		// end of while(TRUE)
 	
-    free(vtx_pctr); vertex_mem--; vtx_pctr=NULL;
-    free(vtx_best); vertex_mem--; vtx_best=NULL;
+    vertex_destroy(vtx_pctr); vtx_pctr=NULL;
+    vertex_destroy(vtx_best); vtx_best=NULL;
   }
   
   //return(1);
@@ -3790,7 +3785,7 @@ int job_build_tree_support(void)
 	vtx_x_axis->x=vtx_temp->x;					// vtx_x_axis is now normalized in plane perpendicular to branch
 	vtx_x_axis->y=vtx_temp->y;
 	vtx_x_axis->z=vtx_temp->z;
-	free(vec_x_axis); vector_mem--; vec_x_axis=NULL;
+	vector_destroy(vec_x_axis); vec_x_axis=NULL;
   
 	vtx_y_axis=vertex_make();					// create vertex to hold direction of y-axis
 	vertex_crossproduct(vtx_dir,vtx_x_axis,vtx_y_axis);		// generate cross product
@@ -3799,7 +3794,7 @@ int job_build_tree_support(void)
 	vtx_y_axis->x=vtx_temp->x;					// vtx_y_axis is now normalized in plane perpendicular to branch
 	vtx_y_axis->y=vtx_temp->y;
 	vtx_y_axis->z=vtx_temp->z;
-	free(vec_y_axis); vector_mem--; vec_y_axis=NULL;
+	vector_destroy(vec_y_axis); vec_y_axis=NULL;
 	
 	// finally apply transform to move, rotate, and scale the circle
 	vptr=vtx_first;
@@ -3816,11 +3811,11 @@ int job_build_tree_support(void)
 	  }
 	  
 	// clean-up
-	free(vtx_x_axis); vertex_mem--; vtx_x_axis=NULL;  
-	free(vtx_y_axis); vertex_mem--; vtx_y_axis=NULL;  
-	free(vtx_temp); vertex_mem--; vtx_temp=NULL;
-	free(vtx_dir); vertex_mem--; vtx_dir=NULL;
-	free(vtx_up); vertex_mem--; vtx_up=NULL;
+	vertex_destroy(vtx_x_axis); vtx_x_axis=NULL;  
+	vertex_destroy(vtx_y_axis); vtx_y_axis=NULL;  
+	vertex_destroy(vtx_temp);   vtx_temp=NULL;
+	vertex_destroy(vtx_dir);    vtx_dir=NULL;
+	vertex_destroy(vtx_up);     vtx_up=NULL;
 	*/
 	
 	// apply transform to move to branch center and scale in proportion to weight

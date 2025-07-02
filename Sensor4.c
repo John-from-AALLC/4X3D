@@ -523,8 +523,8 @@ int build_table_line_laser_scan(void)
 
   build_table_scan_index(1);
 
-  free(vstart); vertex_mem--; vstart=NULL;
-  free(vfinish);vertex_mem--; vfinish=NULL;
+  vertex_destroy(vstart);  vstart=NULL;
+  vertex_destroy(vfinish); vfinish=NULL;
 
   return(1);
 }
@@ -654,7 +654,7 @@ int build_table_step_scan(int slot, int sensor_type)
     }
   vptr=vertex_make();
   vnew=vertex_make();
-  set_holding_torque(ON);
+  set_holding_torque(HOLDING_TQ_ALWAYS_ON);
   
   // set up reads and position based on sensor type
   if(sensor_type==1)
@@ -823,10 +823,8 @@ int build_table_step_scan(int slot, int sensor_type)
   make_toolchange(slot,1);
   goto_machine_home();
 
-  free(vptr);
-  vertex_mem--;
-  free(vnew);
-  vertex_mem--;
+  vertex_destroy(vptr);
+  vertex_destroy(vnew);
   
   //if(job.state!=JOB_RUNNING)return(0);
   
@@ -1075,7 +1073,7 @@ int build_table_sweep_scan(int slot, int sensor_type)
       {
       oldvptr=vptr;
       vptr=vptr->next;
-      free(oldvptr); vertex_mem--;
+      vertex_destroy(oldvptr);
       }
 
     // increment to next row
@@ -1157,7 +1155,7 @@ int build_table_sweep_scan(int slot, int sensor_type)
 	  {
 	  oldvptr=vptr;
 	  vptr=vptr->next;
-	  free(oldvptr); vertex_mem--;
+	  vertex_destroy(oldvptr);
 	  }
     
 	h++;
@@ -1169,8 +1167,8 @@ int build_table_sweep_scan(int slot, int sensor_type)
   make_toolchange(slot,1);
   goto_machine_home();
 
-  free(vstart); vertex_mem--; vstart=NULL;
-  free(vfinish);vertex_mem--; vfinish=NULL;
+  vertex_destroy(vstart); vstart=NULL;
+  vertex_destroy(vfinish); vfinish=NULL;
   
   if(job.state!=JOB_RUNNING)return(0);
   
@@ -1359,7 +1357,7 @@ int build_table_centerline_scan(int slot, int sensor_type)
     {
     oldvptr=vptr;
     vptr=vptr->next;
-    free(oldvptr); vertex_mem--;
+    vertex_destroy(oldvptr);
     }
 
   // define initial targets
@@ -1453,7 +1451,7 @@ int build_table_centerline_scan(int slot, int sensor_type)
     {
     oldvptr=vptr;
     vptr=vptr->next;
-    free(oldvptr); vertex_mem--;
+    vertex_destroy(oldvptr);
     }
 
   // add on scan_dist buffer to found values
@@ -1463,8 +1461,8 @@ int build_table_centerline_scan(int slot, int sensor_type)
   scan_y_end   += scan_dist;
 
   // more clean up
-  free(vstart); vertex_mem--; vstart=NULL;
-  free(vfinish);vertex_mem--; vfinish=NULL;
+  vertex_destroy(vstart); vstart=NULL;
+  vertex_destroy(vfinish); vfinish=NULL;
   
   return(1);
 }

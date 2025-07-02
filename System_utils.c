@@ -375,7 +375,7 @@ int unit_calibration(void)
       }
     }
     
-  free(vptr);vertex_mem--;
+  vertex_destroy(vptr);
   
   save_unit_calibration();
   return(1);
@@ -464,7 +464,7 @@ int ztable_calibration(void)
     }
   else 
     {
-    set_holding_torque(ON);						// turn on motors
+    set_holding_torque(HOLDING_TQ_ALWAYS_ON);				// turn on motors
     tool_tip_home(slot);						// find home
     tool_tip_deposit(slot);						// move into z position
     make_toolchange(-1,0);						// turn off all steppers to prevent overheating
@@ -551,7 +551,7 @@ int ztable_calibration(void)
   // move carriage back to home
   goto_machine_home();
   
-  free(vptr);vertex_mem--;
+  vertex_destroy(vptr);
   
   return(1);
 }

@@ -846,7 +846,7 @@ int laser_scan_images_to_STL(void)
 	  vtxnew[0]=vertex_make();						// ... make its vtx
 	  vtxnew[0]->x=x; vtxnew[0]->y=y; vtxnew[0]->z=xy_on_table[x][y];	// ... load its xyz value
 	  vtx_ptr=vertex_unique_insert(mptr,mptr->vertex_last[MODEL],vtxnew[0],MODEL,CLOSE_ENOUGH);
-	  if(vtx_ptr!=vtxnew[0]){free(vtxnew[0]); vertex_mem--; vtxnew[0]=vtx_ptr;}
+	  if(vtx_ptr!=vtxnew[0]){vertex_destroy(vtxnew[0]); vtxnew[0]=vtx_ptr;}
 	  if(debug_flag==611)printf("  vtx0 made \n");
 	  
 	  // check for 2nd vtx
@@ -855,7 +855,7 @@ int laser_scan_images_to_STL(void)
 	    vtxnew[1]=vertex_make();
 	    vtxnew[1]->x=x+step_size; vtxnew[1]->y=y; vtxnew[1]->z=xy_on_table[x+step_size][y];
 	    vtx_ptr=vertex_unique_insert(mptr,mptr->vertex_last[MODEL],vtxnew[1],MODEL,CLOSE_ENOUGH);
-	    if(vtx_ptr!=vtxnew[1]){free(vtxnew[1]); vertex_mem--; vtxnew[1]=vtx_ptr;}
+	    if(vtx_ptr!=vtxnew[1]){vertex_destroy(vtxnew[1]); vtxnew[1]=vtx_ptr;}
 	    if(debug_flag==611)printf("  vtx1 made \n");
 	    }
 	    
@@ -865,7 +865,7 @@ int laser_scan_images_to_STL(void)
 	    vtxnew[2]=vertex_make();
 	    vtxnew[2]->x=x; vtxnew[2]->y=y+step_size; vtxnew[2]->z=xy_on_table[x][y+step_size];
 	    vtx_ptr=vertex_unique_insert(mptr,mptr->vertex_last[MODEL],vtxnew[2],MODEL,CLOSE_ENOUGH);
-	    if(vtx_ptr!=vtxnew[2]){free(vtxnew[2]); vertex_mem--; vtxnew[2]=vtx_ptr;}
+	    if(vtx_ptr!=vtxnew[2]){vertex_destroy(vtxnew[2]); vtxnew[2]=vtx_ptr;}
 	    if(debug_flag==611)printf("  vtx2 made \n");
 	    }
 	    
@@ -875,7 +875,7 @@ int laser_scan_images_to_STL(void)
 	    vtxnew[3]=vertex_make();
 	    vtxnew[3]->x=x+step_size; vtxnew[3]->y=y+step_size; vtxnew[3]->z=xy_on_table[x+step_size][y+step_size];
 	    vtx_ptr=vertex_unique_insert(mptr,mptr->vertex_last[MODEL],vtxnew[3],MODEL,CLOSE_ENOUGH);
-	    if(vtx_ptr!=vtxnew[3]){free(vtxnew[3]); vertex_mem--; vtxnew[3]=vtx_ptr;}
+	    if(vtx_ptr!=vtxnew[3]){vertex_destroy(vtxnew[3]); vtxnew[3]=vtx_ptr;}
 	    if(debug_flag==611)printf("  vtx3 made \n");
 	    }
 
@@ -886,7 +886,7 @@ int laser_scan_images_to_STL(void)
 	    {
 	    for(i=0;i<4;i++)								// ... check all 4
 	      {
-	      if(vtxnew[i]!=NULL){free(vtxnew[i]); vertex_mem--; vtxnew[i]=NULL;}	// ... remove from memory
+	      if(vtxnew[i]!=NULL){vertex_destroy(vtxnew[i]); vtxnew[i]=NULL;}	// ... remove from memory
 	      }
 	    if(debug_flag==611)printf("  not enough vtxs... continuing. \n");
 	    xy_on_table[x][y]=0;							// ... zero out
@@ -944,7 +944,7 @@ int laser_scan_images_to_STL(void)
 	    vtx_new=vertex_copy(fnew->vtx[i],NULL);
 	    vtx_new->z=0;
 	    vtx_ptr=vertex_unique_insert(mptr,mptr->vertex_last[MODEL],vtx_new,MODEL,CLOSE_ENOUGH);
-	    if(vtx_ptr!=vtx_new){free(vtx_new); vertex_mem--; vtx_new=vtx_ptr;}
+	    if(vtx_ptr!=vtx_new){vertex_destroy(vtx_new); vtx_new=vtx_ptr;}
 	    fbtm->vtx[i]=vtx_new;
 	    fbtm->vtx[i]->flist=facet_list_manager(fbtm->vtx[i]->flist,fbtm,ACTION_ADD);
 	    }
@@ -975,7 +975,7 @@ int laser_scan_images_to_STL(void)
 	      vtx_new=vertex_copy(fnew->vtx[i],NULL);
 	      vtx_new->z=0;
 	      vtx_ptr=vertex_unique_insert(mptr,mptr->vertex_last[MODEL],vtx_new,MODEL,CLOSE_ENOUGH);
-	      if(vtx_ptr!=vtx_new){free(vtx_new); vertex_mem--; vtx_new=vtx_ptr;}
+	      if(vtx_ptr!=vtx_new){vertex_destroy(vtx_new); vtx_new=vtx_ptr;}
 	      fbtm->vtx[i]=vtx_new;
 	      fbtm->vtx[i]->flist=facet_list_manager(fbtm->vtx[i]->flist,fbtm,ACTION_ADD);
 	      }
@@ -1356,25 +1356,25 @@ int image_to_STL(model *mptr)
 	vtxnew[0]=vertex_make();					// ... make its vtx
 	vtxnew[0]->x=x0; vtxnew[0]->y=y0; vtxnew[0]->z=z0;		// ... load its xyz value
 	vtx_ptr=vertex_unique_insert(mptr,mptr->vertex_last[MODEL],vtxnew[0],MODEL,CLOSE_ENOUGH);
-	if(vtx_ptr!=vtxnew[0]){free(vtxnew[0]); vertex_mem--; vtxnew[0]=vtx_ptr;}
+	if(vtx_ptr!=vtxnew[0]){vertex_destroy(vtxnew[0]); vtxnew[0]=vtx_ptr;}
 	  
 	// check for 2nd vtx
 	vtxnew[1]=vertex_make();
 	vtxnew[1]->x=x1; vtxnew[1]->y=y1; vtxnew[1]->z=z1;
 	vtx_ptr=vertex_unique_insert(mptr,mptr->vertex_last[MODEL],vtxnew[1],MODEL,CLOSE_ENOUGH);
-	if(vtx_ptr!=vtxnew[1]){free(vtxnew[1]); vertex_mem--; vtxnew[1]=vtx_ptr;}
+	if(vtx_ptr!=vtxnew[1]){vertex_destroy(vtxnew[1]); vtxnew[1]=vtx_ptr;}
 	    
 	// check for 3rd vtx
 	vtxnew[2]=vertex_make();
 	vtxnew[2]->x=x2; vtxnew[2]->y=y2; vtxnew[2]->z=z2;
 	vtx_ptr=vertex_unique_insert(mptr,mptr->vertex_last[MODEL],vtxnew[2],MODEL,CLOSE_ENOUGH);
-	if(vtx_ptr!=vtxnew[2]){free(vtxnew[2]); vertex_mem--; vtxnew[2]=vtx_ptr;}
+	if(vtx_ptr!=vtxnew[2]){vertex_destroy(vtxnew[2]); vtxnew[2]=vtx_ptr;}
 	    
 	// check for 4th vtx
 	vtxnew[3]=vertex_make();
 	vtxnew[3]->x=x3; vtxnew[3]->y=y3; vtxnew[3]->z=z3;
 	vtx_ptr=vertex_unique_insert(mptr,mptr->vertex_last[MODEL],vtxnew[3],MODEL,CLOSE_ENOUGH);
-	if(vtx_ptr!=vtxnew[3]){free(vtxnew[3]); vertex_mem--; vtxnew[3]=vtx_ptr;}
+	if(vtx_ptr!=vtxnew[3]){vertex_destroy(vtxnew[3]); vtxnew[3]=vtx_ptr;}
 
 	// make facet
 	fct_cnt++;
@@ -1407,7 +1407,7 @@ int image_to_STL(model *mptr)
 	  vtx_new=vertex_copy(fnew->vtx[i],NULL);
 	  vtx_new->z=0;
 	  vtx_ptr=vertex_unique_insert(mptr,mptr->vertex_last[MODEL],vtx_new,MODEL,CLOSE_ENOUGH);
-	  if(vtx_ptr!=vtx_new){free(vtx_new); vertex_mem--; vtx_new=vtx_ptr;}
+	  if(vtx_ptr!=vtx_new){vertex_destroy(vtx_new); vtx_new=vtx_ptr;}
 	  fbtm->vtx[i]=vtx_new;
 	  fbtm->vtx[i]->flist=facet_list_manager(fbtm->vtx[i]->flist,fbtm,ACTION_ADD);
 	  }
@@ -1438,7 +1438,7 @@ int image_to_STL(model *mptr)
 	  vtx_new=vertex_copy(fnew->vtx[i],NULL);
 	  vtx_new->z=0;
 	  vtx_ptr=vertex_unique_insert(mptr,mptr->vertex_last[MODEL],vtx_new,MODEL,CLOSE_ENOUGH);
-	  if(vtx_ptr!=vtx_new){free(vtx_new); vertex_mem--; vtx_new=vtx_ptr;}
+	  if(vtx_ptr!=vtx_new){vertex_destroy(vtx_new); vtx_new=vtx_ptr;}
 	  fbtm->vtx[i]=vtx_new;
 	  fbtm->vtx[i]->flist=facet_list_manager(fbtm->vtx[i]->flist,fbtm,ACTION_ADD);
 	  }
@@ -1505,11 +1505,11 @@ int image_to_STL(model *mptr)
 	  vtxyC=vertex_copy(vtxyA,NULL);
 	  vtxyC->z=0.0;
 	  vtx_ptr=vertex_unique_insert(mptr,mptr->vertex_last[MODEL],vtxyC,MODEL,CLOSE_ENOUGH);
-	  if(vtx_ptr!=vtxyC){free(vtxyC); vertex_mem--; vtxyC=vtx_ptr;}
+	  if(vtx_ptr!=vtxyC){vertex_destroy(vtxyC); vtxyC=vtx_ptr;}
 	  vtxyD=vertex_copy(vtxyB,NULL);
 	  vtxyD->z=0.0;
 	  vtx_ptr=vertex_unique_insert(mptr,mptr->vertex_last[MODEL],vtxyD,MODEL,CLOSE_ENOUGH);
-	  if(vtx_ptr!=vtxyD){free(vtxyD); vertex_mem--; vtxyD=vtx_ptr;}
+	  if(vtx_ptr!=vtxyD){vertex_destroy(vtxyD); vtxyD=vtx_ptr;}
       
 	  // search facets with same xy but z at 0 to find lower facet with matching free edge
 	  /*
